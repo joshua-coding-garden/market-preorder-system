@@ -39,6 +39,9 @@ export function loadTestEnv(): void {
   process.env.NODE_ENV = 'test'
   process.env.DATABASE_URL = testUrl
   process.env.TZ = 'Asia/Taipei'
-  // 測試不打真的 LINE API，但 config 仍需通過驗證
+  // 測試不打真的 LINE API（用 tests/lineMock.ts 取代），但 config 仍需通過驗證。
+  // channel secret 要有值，webhook 的簽章驗證才測得起來。
   process.env.JWT_SECRET ??= 'test-secret-value-that-is-long-enough-32'
+  process.env.LINE_MESSAGING_CHANNEL_SECRET ||= 'test-line-channel-secret'
+  process.env.LINE_LOGIN_CHANNEL_ID ||= 'test-login-channel-id'
 }

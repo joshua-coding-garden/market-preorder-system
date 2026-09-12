@@ -367,3 +367,64 @@ LINE Login 的 Callback URL 必須是外部連得到的 HTTPS 網址，`localhos
    避免日後有人加上不同的 message 而造成可以探測別攤取貨碼。
 3. **CSV 用 fetch 取回再存成 Blob**，不是直接開連結 —— 這樣才帶得到 session cookie，
    也才能把 403 當成錯誤處理。
+
+---
+
+## Sprint 5｜LINE Bot 與系統通知
+
+日期：2026-09-12
+
+### 完成項目
+
+- **`lib/line/sender.ts`：所有 LINE 訊息的唯一出口（B-11、04 §E）**
+  - 估算 → 查額度（LINE quota API，取不到時 fallback 本地統計 Q5）→ 超過即阻擋
+  - 超過額度時**每個收件人寫一筆 `SKIPPED_QUOTA` 並 throw，完全不呼叫任何 LINE API**
+  - 依人數選 API：1 人 push、多人 multicast（500 一批）、`ALL_FRIENDS` broadcast
+  - 每個收件人都留一筆 `notification`（SENT／FAILED／SKIPPED_QUOTA）
+- **`lib/line/client.ts`**：抽成介面，測試可注入 mock（`tests/lineMock.ts`）。
+  未設定 access token 時是「明確失敗」的替身，不會靜默當作成功。
+- **通知**：`NEW_ORDER`（子單建立後推給該攤所有成員）、
+  `PICKUP_REMINDER`（場次當天 `PICKUP_REMINDER_HOUR`，預設 08:00 台北）。
+- **webhook `/line/webhook`（04 §D）**：`x-line-signature` 用 `timingSafeEqual` 驗證，
+  失敗回 400 且不處理任何事件；支援 `follow`／`message.text`（邀請碼）／`postback`／`unfollow`。
+  webhook 這一支自己收 raw body 才算得出簽章，註冊在獨立 scope 不影響其他 route。
+- **邀請碼綁定與網頁端共用同一個 `redeemInvite` service**（03 §3）。
+- **LIFF**：`POST /auth/line/liff` 用 ID token 換 session（伺服器端驗證），
+  `GET /auth/liff-config` 給前端初始化用。
+- **圖文選單**：`pnpm line:richmenu` 用 script 建立三格選單（不手動設定），
+  重跑會先刪同名舊選單。
+
+### 驗收結果（07 §S5）
+
+| # | 項目 | 結果 |
+|---|---|---|
+| S5-1 | 錯誤簽章 → 400，不處理任何事件 | ✅ `[auto]` 另驗缺 header 也 400、且不會建立任何 app_user |
+| S5-2 | `follow` → 新增 app_user，回覆含「本週市集」按鈕 | ✅ `[auto]` display_name 由 profile API 補；已存在者不重複建立 |
+| S5-3 | 文字 `邀請碼 a20260912-0001`（小寫、有空白） | ✅ `[auto]` 綁定成功、碼變 REDEEMED、回覆含攤商名與攤位；另驗無空白格式 |
+| S5-4 | 無效邀請碼 → 「邀請碼無效或已使用」 | ✅ `[auto]` 涵蓋不存在、已兌換、格式不符、一般文字四種 |
+| S5-5 | A 有 2 位成員 → 2 筆 `NEW_ORDER` SENT、push 2 次 | ✅ `[auto]` 另驗單人走 push、跨攤各收各的、無成員不產生通知、送出失敗記 FAILED |
+| S5-6 | used=199 limit=200 → 0 次 push、2 筆 SKIPPED_QUOTA、**訂單仍成立** | ✅ `[auto]` 三項都驗：訂單存在、push/multicast/broadcast 呼叫數皆為 0、兩筆 SKIPPED_QUOTA |
+| S5-7 | 3 位有 PENDING → 3 筆 SENT；再執行不重複 | ✅ `[auto]` 全部取貨的那位不會收到；第二次 `sent=0, skipped=3` |
+| S5-8 | 真 LINE 帳號點圖文選單三個按鈕 | ⬜ **待委託方執行**（需要 Messaging API channel 憑證） |
+| S5-9 | 真攤商帳號收到新訂單訊息 | ⬜ **待委託方執行**（同上） |
+
+`pnpm typecheck` ✅　`pnpm lint` ✅　`pnpm test` ✅ 142/142
+（新增 webhook 13 + notification 13）
+
+### 實作決定
+
+1. **NEW_ORDER 在 commit 後 await，但例外一律吞掉**。S5-6 要求額度不足時訂單仍成立，
+   所以 `createOrder` 把 `notifyNewOrder` 包在 try/catch 裡 —— sender 已經把每個收件人
+   記成 `SKIPPED_QUOTA`，訂單照常回傳 201。
+2. **Google 暫時帳號收不到推播**：sender 會辨識 `google:` 前綴，
+   直接記 `FAILED`（錯誤訊息「此帳號不是 LINE 使用者」）而不浪費額度。已有測試覆蓋。
+3. **webhook 一律回 200**（除簽章／JSON 錯誤外）。處理失敗只記 log，
+   否則 LINE 會不斷重送同一批事件。
+
+### 待委託方提供
+
+S5-8／S5-9 需要 **Messaging API channel**（與 LINE Login **同一個 Provider**）的
+channel secret 與 access token。填進 `.env` 後：
+1. 到 LINE Console 把 webhook URL 設成 `{WEB_URL}/api/line/webhook` 並啟用
+2. 執行 `pnpm line:richmenu` 建立圖文選單
+3. 用真 LINE 帳號加好友測 S5-2／S5-3，再下一筆單測 S5-9

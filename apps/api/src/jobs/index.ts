@@ -1,5 +1,7 @@
 import type { FastifyBaseLogger } from 'fastify'
 import cron, { type ScheduledTask } from 'node-cron'
+import { config } from '../config.js'
+import { pickupReminder } from '../modules/line/notificationService.js'
 import { inviteExpire, inviteRecycle } from './inviteJobs.js'
 
 /**
@@ -25,8 +27,17 @@ export function startJobs(log: FastifyBaseLogger): ScheduledTask[] {
     cron.schedule('0 3 * * *', run('inviteRecycle', () => inviteRecycle()), {
       timezone: TIMEZONE,
     }),
+    // 當日取貨提醒（Q-06 預設 08:00 台北，可用 PICKUP_REMINDER_HOUR 調整）
+    cron.schedule(
+      `0 ${config.PICKUP_REMINDER_HOUR} * * *`,
+      run('pickupReminder', () => pickupReminder()),
+      { timezone: TIMEZONE },
+    ),
   ]
 
-  log.info({ jobs: ['inviteExpire', 'inviteRecycle'] }, 'scheduled jobs started')
+  log.info(
+    { jobs: ['inviteExpire', 'inviteRecycle', 'pickupReminder'] },
+    'scheduled jobs started',
+  )
   return tasks
 }

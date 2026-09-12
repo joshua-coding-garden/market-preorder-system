@@ -5,6 +5,9 @@ import { prisma } from '../src/lib/db.js'
 import { signSession } from '../src/lib/jwt.js'
 import { hhmmToTime, isoDateToDate, taipeiToUtc, todayInTaipei, addDaysIso } from '../src/lib/time.js'
 
+// 測試常用的時間工具，統一從 helpers 匯出，避免每個測試檔各自 import
+export { isoDateToDate, todayInTaipei, addDaysIso, hhmmToTime, taipeiToUtc }
+
 /** 依相依順序清空所有資料表（保留 _prisma_migrations） */
 export async function resetDb(): Promise<void> {
   await prisma.$executeRawUnsafe(`

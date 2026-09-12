@@ -6,6 +6,7 @@ import { events } from '../../lib/events.js'
 import { isUniqueViolation } from '../../lib/inviteCode.js'
 import { PICKUP_CODE_MAX_ATTEMPTS, generatePickupCode } from '../../lib/pickupCode.js'
 import { dateToIsoDate, timeToHhmm } from '../../lib/time.js'
+import { notifyNewOrder } from '../line/notificationService.js'
 import { isOrderable } from '../market/service.js'
 
 /**
@@ -289,7 +290,7 @@ export async function createOrder(
     return { preorderId: preorder.id, created }
   })
 
-  // 9. commit 後（交易外）發事件：socket 推送與 LINE 通知
+  // 9. commit 後（交易外）：socket 推送 + LINE 通知
   for (const so of preorderId.created) {
     events.emit('order:new', {
       subOrderId: so.subOrderId,
@@ -299,6 +300,16 @@ export async function createOrder(
       itemCount: so.itemCount,
       subtotal: so.subtotal,
     })
+  }
+
+  // LINE 通知失敗（含額度不足）不得影響訂單成立（S5-6）。
+  // sender 已把每個收件人記成 SKIPPED_QUOTA／FAILED，這裡只吞掉例外。
+  for (const so of preorderId.created) {
+    try {
+      await notifyNewOrder(so.subOrderId)
+    } catch {
+      // 已記錄在 notification 表，訂單照常回傳
+    }
   }
 
   return { order: await serializeOrder(preorderId.preorderId), created: true }

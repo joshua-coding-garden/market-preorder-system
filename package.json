@@ -21,6 +21,7 @@
     "db:migrate:dev": "pnpm --filter @market/api db:migrate:dev",
     "db:seed": "pnpm --filter @market/api db:seed",
     "db:seed:demo": "pnpm --filter @market/api db:seed:demo",
+    "line:richmenu": "pnpm --filter @market/api line:richmenu",
     "db:studio": "pnpm --filter @market/api db:studio"
   },
   "devDependencies": {
