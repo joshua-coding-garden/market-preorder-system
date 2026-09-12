@@ -3,6 +3,7 @@ import { api } from '@/api/client'
 import { toMessage, useApi } from '@/api/useApi'
 import { ErrorState, PageHeader, Spinner, formatTaipeiDateTime } from '@/components/common'
 import { FormError, Toast } from '@/components/form'
+import ImpersonatePicker from '@/components/ImpersonatePicker'
 
 interface Account {
   id: string
@@ -27,11 +28,10 @@ interface StallItem {
   name: string
 }
 
-interface Target {
-  id: string
-  displayName: string
-  role: 'user' | 'operator'
-  stalls: { id: string; name: string }[]
+const PROVIDER_LABEL: Record<string, string> = {
+  LINE: 'LINE',
+  GOOGLE: 'Google',
+  LOCAL: '帳號密碼',
 }
 
 const ROLE_HINT: Record<string, string> = {
@@ -46,15 +46,9 @@ const ROLE_HINT: Record<string, string> = {
 export default function Permissions() {
   const accounts = useApi<AccountsResponse>('/operator/accounts')
   const stalls = useApi<{ items: StallItem[] }>('/operator/stalls')
-  const targets = useApi<{ items: Target[]; enabled: boolean }>(
-    '/operator/impersonation/targets',
-  )
-
   const [toast, setToast] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
-  const [pickerOpen, setPickerOpen] = useState(false)
-
   const showToast = (msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(null), 2200)
@@ -74,41 +68,18 @@ export default function Permissions() {
     }
   }
 
-  const impersonate = async (body: { as: 'USER'; userId: string } | { as: 'GUEST' }) => {
-    setError(null)
-    try {
-      await api.post('/operator/impersonation', body)
-      // 身分整個換掉，重載到顧客首頁最直觀
-      window.location.href = '/'
-    } catch (err) {
-      setError(toMessage(err))
-    }
-  }
-
   if (accounts.loading) return <Spinner />
   if (accounts.error) return <ErrorState message={accounts.error} onRetry={accounts.reload} />
   if (!accounts.data) return null
 
   const { summary, items, selfId } = accounts.data
-  // 身分模擬未啟用時，targets 會回 403
-  const impersonationEnabled = targets.data?.enabled === true
 
   return (
     <>
       <PageHeader
         title="帳號與權限"
         subtitle="僅管理員可見"
-        action={
-          <button
-            type="button"
-            className="btn-secondary text-sm"
-            onClick={() => setPickerOpen(true)}
-            disabled={!impersonationEnabled}
-            title={impersonationEnabled ? undefined : '需在 .env 設定 ENABLE_IMPERSONATION=true'}
-          >
-            以其他身分檢視
-          </button>
-        }
+        action={<ImpersonatePicker selfId={selfId} />}
       />
 
       <div className="grid grid-cols-3 gap-2 px-4 pb-4">
@@ -130,7 +101,153 @@ export default function Permissions() {
 
       <h2 className="px-4 pb-2 pt-1 text-base font-semibold">帳號清單（{summary.total}）</h2>
 
-      <ul className="space-y-3 px-4">
+      {/* 桌面：表格一列一個帳號，橫向空間才不會浪費 */}
+      <div className="hidden px-4 md:block">
+        <div className="card overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-xs text-neutral-500">
+              <tr>
+                <th className="px-3 py-2 font-medium">帳號</th>
+                <th className="px-3 py-2 font-medium">權限</th>
+                <th className="px-3 py-2 font-medium">所屬攤商</th>
+                <th className="px-3 py-2 font-medium">最後登入</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-100">
+              {items.map((a) => {
+                const isSelf = a.id === selfId
+                const busy = busyId === a.id
+                return (
+                  <tr key={a.id} className="align-top">
+                    <td className="px-3 py-3">
+                      <p className="flex items-center gap-1.5 font-medium">
+                        <span>{a.displayName || '（未命名）'}</span>
+                        {isSelf ? (
+                          <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] text-white">
+                            你
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="mt-0.5 font-mono text-xs text-neutral-500">
+                        {PROVIDER_LABEL[a.provider]}｜{a.loginId}
+                      </p>
+                      {a.provider !== 'LINE' ? (
+                        <p className="mt-1 inline-block rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-800">
+                          暫時帳號・收不到 LINE 推播
+                        </p>
+                      ) : null}
+                    </td>
+
+                    <td className="px-3 py-3">
+                      <select
+                        className="w-full rounded-lg border border-neutral-300 bg-white px-2.5 py-1.5 text-sm disabled:bg-neutral-100 disabled:text-neutral-400"
+                        value={a.role}
+                        disabled={isSelf || busy}
+                        onChange={(e) =>
+                          run(
+                            a.id,
+                            () =>
+                              api.patch(`/operator/accounts/${a.id}/role`, {
+                                role: e.target.value,
+                              }),
+                            '已更新權限',
+                          )
+                        }
+                      >
+                        <option value="operator">系統管理員</option>
+                        <option value="user">一般使用者</option>
+                      </select>
+                      <p
+                        className={`mt-1 rounded px-1.5 py-1 text-[10px] leading-snug ${
+                          a.role === 'operator'
+                            ? 'bg-amber-50 text-amber-800'
+                            : 'bg-neutral-100 text-neutral-600'
+                        }`}
+                      >
+                        {ROLE_HINT[a.role]}
+                      </p>
+                    </td>
+
+                    <td className="px-3 py-3">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {a.stalls.length === 0 ? (
+                          <span className="text-xs text-neutral-400">未綁定</span>
+                        ) : (
+                          a.stalls.map((s) => (
+                            <span
+                              key={s.id}
+                              className="inline-flex items-center gap-1 rounded-full bg-blue-50 py-0.5 pl-2.5 pr-1 text-xs text-blue-800"
+                            >
+                              {s.name}
+                              <button
+                                type="button"
+                                className="rounded-full px-1 text-blue-500 hover:text-blue-800"
+                                disabled={busy}
+                                onClick={() =>
+                                  run(
+                                    a.id,
+                                    () =>
+                                      api.delete(`/operator/accounts/${a.id}/stalls/${s.id}`),
+                                    '已移除攤商綁定',
+                                  )
+                                }
+                                aria-label={`移除 ${s.name}`}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))
+                        )}
+                      </div>
+                      <select
+                        className="mt-1.5 w-full rounded-lg border border-neutral-300 bg-white px-2.5 py-1.5 text-xs"
+                        value=""
+                        disabled={busy}
+                        onChange={(e) => {
+                          if (!e.target.value) return
+                          const stallId = e.target.value
+                          e.target.value = ''
+                          run(
+                            a.id,
+                            () => api.post(`/operator/accounts/${a.id}/stalls`, { stallId }),
+                            '已加入攤商',
+                          )
+                        }}
+                      >
+                        <option value="">＋ 直接加入（不經邀請碼）</option>
+                        {stalls.data?.items
+                          .filter((s) => !a.stalls.some((x) => x.id === s.id))
+                          .map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name}
+                            </option>
+                          ))}
+                      </select>
+                    </td>
+
+                    <td className="whitespace-nowrap px-3 py-3 text-xs text-neutral-500">
+                      {a.lastLoginAt ? formatTaipeiDateTime(a.lastLoginAt) : '未曾登入'}
+                      <br />
+                      <span className="text-neutral-400">
+                        建立 {formatTaipeiDateTime(a.createdAt)}
+                      </span>
+                      {a.orderCount > 0 ? (
+                        <>
+                          <br />
+                          <span className="text-neutral-400">{a.orderCount} 筆訂單</span>
+                        </>
+                      ) : null}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 手機：一個帳號一張卡 */}
+      <ul className="space-y-3 px-4 md:hidden">
         {items.map((a) => {
           const isSelf = a.id === selfId
           const busy = busyId === a.id
@@ -147,8 +264,7 @@ export default function Permissions() {
                     ) : null}
                   </p>
                   <p className="mt-0.5 truncate font-mono text-xs text-neutral-500">
-                    {a.provider === 'GOOGLE' ? 'Google' : a.provider === 'LOCAL' ? '帳號密碼' : 'LINE'}
-                    ｜{a.loginId}
+                    {PROVIDER_LABEL[a.provider]}｜{a.loginId}
                   </p>
                 </div>
                 {a.provider !== 'LINE' ? (
@@ -259,106 +375,7 @@ export default function Permissions() {
         你不能更改自己的權限，系統也一定保留至少一位管理員 —— 避免把所有人鎖在系統外面。
       </p>
 
-      {pickerOpen ? (
-        <ImpersonatePicker
-          targets={targets.data?.items ?? []}
-          selfId={selfId}
-          onClose={() => setPickerOpen(false)}
-          onPick={impersonate}
-        />
-      ) : null}
-
       <Toast message={toast} />
     </>
-  )
-}
-
-function ImpersonatePicker({
-  targets,
-  selfId,
-  onClose,
-  onPick,
-}: {
-  targets: Target[]
-  selfId: string
-  onClose: () => void
-  onPick: (body: { as: 'USER'; userId: string } | { as: 'GUEST' }) => void
-}) {
-  const others = targets.filter((t) => t.id !== selfId)
-  const stallUsers = others.filter((t) => t.role !== 'operator' && t.stalls.length > 0)
-  const customers = others.filter((t) => t.role !== 'operator' && t.stalls.length === 0)
-  const operators = others.filter((t) => t.role === 'operator')
-
-  const Row = ({ t, desc }: { t: Target; desc: string }) => (
-    <button
-      type="button"
-      className="w-full rounded-xl border border-neutral-200 px-3 py-3 text-left active:bg-neutral-50"
-      onClick={() => onPick({ as: 'USER', userId: t.id })}
-    >
-      <p className="text-sm font-medium">{t.displayName || '（未命名）'}</p>
-      <p className="mt-0.5 text-xs text-neutral-500">{desc}</p>
-    </button>
-  )
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-4 sm:rounded-2xl">
-        <div className="flex items-center justify-between pb-2">
-          <h2 className="text-base font-semibold">以其他身分檢視</h2>
-          <button type="button" onClick={onClose} className="px-2 text-xl text-neutral-400">
-            ×
-          </button>
-        </div>
-
-        <p className="mb-4 rounded-xl bg-neutral-100 px-3 py-2.5 text-xs leading-relaxed text-neutral-600">
-          切換之後，你的權限會<strong>真的</strong>降到那個身分 —— 按下不該有的操作會被後端擋下來，
-          跟那個身分實際遇到的一模一樣。這不是只把按鈕藏起來。
-        </p>
-
-        <div className="space-y-2">
-          <button
-            type="button"
-            className="w-full rounded-xl border border-neutral-200 px-3 py-3 text-left active:bg-neutral-50"
-            onClick={() => onPick({ as: 'GUEST' })}
-          >
-            <p className="text-sm font-medium">訪客（未登入）</p>
-            <p className="mt-0.5 text-xs text-neutral-500">
-              完全登出的樣子：只看得到公開的場次列表與登入頁
-            </p>
-          </button>
-
-          {customers.length > 0 ? (
-            <>
-              <p className="pt-3 text-xs font-medium text-neutral-400">顧客</p>
-              {customers.map((t) => (
-                <Row key={t.id} t={t} desc="只能瀏覽、下單、看自己的訂單" />
-              ))}
-            </>
-          ) : null}
-
-          {stallUsers.length > 0 ? (
-            <>
-              <p className="pt-3 text-xs font-medium text-neutral-400">攤商</p>
-              {stallUsers.map((t) => (
-                <Row
-                  key={t.id}
-                  t={t}
-                  desc={`只看得到 ${t.stalls.map((s) => s.name).join('、')} 的商品與訂單`}
-                />
-              ))}
-            </>
-          ) : null}
-
-          {operators.length > 0 ? (
-            <>
-              <p className="pt-3 text-xs font-medium text-neutral-400">其他管理員</p>
-              {operators.map((t) => (
-                <Row key={t.id} t={t} desc="與你相同的權限" />
-              ))}
-            </>
-          ) : null}
-        </div>
-      </div>
-    </div>
   )
 }
