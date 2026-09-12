@@ -6,7 +6,7 @@ import { FormError, Toast } from '@/components/form'
 
 interface Account {
   id: string
-  provider: 'LINE' | 'GOOGLE'
+  provider: 'LINE' | 'GOOGLE' | 'LOCAL'
   loginId: string
   displayName: string
   role: 'user' | 'operator'
@@ -147,10 +147,11 @@ export default function Permissions() {
                     ) : null}
                   </p>
                   <p className="mt-0.5 truncate font-mono text-xs text-neutral-500">
-                    {a.provider === 'GOOGLE' ? 'Google' : 'LINE'}｜{a.loginId}
+                    {a.provider === 'GOOGLE' ? 'Google' : a.provider === 'LOCAL' ? '帳號密碼' : 'LINE'}
+                    ｜{a.loginId}
                   </p>
                 </div>
-                {a.provider === 'GOOGLE' ? (
+                {a.provider !== 'LINE' ? (
                   <span className="shrink-0 rounded-md bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
                     暫時帳號・收不到 LINE 推播
                   </span>

@@ -8,7 +8,12 @@
 //   GET  /me                    requireAuth
 import { randomUUID } from 'node:crypto'
 import type { FastifyPluginAsync, FastifyReply } from 'fastify'
-import { lineCallbackQuerySchema, lineStartQuerySchema } from '@market/shared'
+import {
+  lineCallbackQuerySchema,
+  lineStartQuerySchema,
+  localLoginSchema,
+  localRegisterSchema,
+} from '@market/shared'
 import { config, isLineLoginConfigured } from '../../config.js'
 import { AppError } from '../../lib/errors.js'
 import { signOauthState, verifyOauthState } from '../../lib/jwt.js'
@@ -23,8 +28,15 @@ import {
   isGoogleLoginConfigured,
   verifyGoogleIdToken,
 } from '../../lib/googleLogin.js'
+import { isLocalLoginEnabled } from '../../lib/localAuth.js'
 import { requireAuth } from '../../plugins/authz.js'
-import { getMe, upsertUserFromGoogle, upsertUserFromLine } from './service.js'
+import {
+  getMe,
+  loginLocalUser,
+  registerLocalUser,
+  upsertUserFromGoogle,
+  upsertUserFromLine,
+} from './service.js'
 
 /** 只允許站內相對路徑，避免 open redirect */
 function safeRedirect(target: string | undefined): string {
@@ -57,7 +69,44 @@ const authRoutes: FastifyPluginAsync = async (app) => {
   app.get('/auth/providers', async () => ({
     line: isLineLoginConfigured(),
     google: isGoogleLoginConfigured(),
+    local: isLocalLoginEnabled(),
   }))
+
+  // ---------------- 帳號密碼（⚠️ 規格外的暫時通道） ----------------
+
+  function assertLocalLoginEnabled(): void {
+    if (!isLocalLoginEnabled()) {
+      throw new AppError(
+        'FORBIDDEN',
+        '帳號密碼登入未啟用。請在 .env 設定 LOCAL_LOGIN_ENABLED=true',
+      )
+    }
+  }
+
+  app.post('/auth/local/register', async (req, reply) => {
+    assertLocalLoginEnabled()
+    const input = localRegisterSchema.parse(req.body)
+    const { userId, promotedToOperator } = await registerLocalUser(input)
+
+    if (promotedToOperator) {
+      req.log.warn(
+        { username: input.username },
+        '第一個註冊的帳號已自動成為管理員（系統原本沒有任何 operator）',
+      )
+    }
+
+    await reply.setSessionCookie(userId)
+    reply.code(201)
+    return { ok: true, promotedToOperator }
+  })
+
+  app.post('/auth/local/login', async (req, reply) => {
+    assertLocalLoginEnabled()
+    const input = localLoginSchema.parse(req.body)
+    const userId = await loginLocalUser(input)
+    await reply.setSessionCookie(userId)
+    return { ok: true }
+  })
 
   // ---------------- LINE Login（正式身分來源） ----------------
 

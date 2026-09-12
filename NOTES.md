@@ -575,6 +575,9 @@ production bundle：JS 390 KB（gzip 115 KB）、CSS 25 KB（gzip 5 KB）。
 
 程式路徑都已完成並可觸達；未設定時端點會回明確錯誤而不是 500。
 
+> 在那之前可以用**帳號密碼註冊**（`LOCAL_LOGIN_ENABLED=true`）先登入測試其他所有功能，
+> 但這種帳號收不到 LINE 推播，所以 S5 的手動項目仍然驗不了。
+
 ### 2. 真實手機（擋住 4 個驗收項）
 
 **S7-1／S7-2／S7-4** 需要 iPhone 與 Android 實機。
@@ -593,16 +596,52 @@ D-12 說正式環境用 S3 相容儲存。目前設成 `s3` 會丟出明確錯�
 
 ## 規格外的追加（委託方 2026-09-12 口頭指示）
 
-以下四項**不在 spec 內**，都標成可拔除，移除方式見 Sprint 1 段落：
+以下五項**不在 spec 內**，都標成可拔除：
 
-1. **Google 第三方登入** —— LINE 憑證未到位前的暫時通道。
+1. **帳號密碼註冊／登入**（`/auth/local/*`）—— LINE、Google 都還沒申請下來時的登入通道。
+   詳見下一節。
+2. **Google 第三方登入** —— 同上，但需要先建 Google OAuth client。
    ⚠️ 這種帳號**收不到 LINE 推播**，正式身分來源仍是 LINE Login（D-11）。
-2. **帳號與權限頁**（`/operator/permissions`）—— 不新增 role，把 `operator` 當系統管理身分。
-3. **身分模擬** —— 換發 session，權限真的降級。`ENABLE_IMPERSONATION` 預設 false。
-4. **`GET /operator/message-quota`** —— O1 儀表板顯示額度所需，但 §10 未列出（規格缺口）。
+3. **帳號與權限頁**（`/operator/permissions`）—— 不新增 role，把 `operator` 當系統管理身分。
+4. **身分模擬** —— 換發 session，權限真的降級。`ENABLE_IMPERSONATION` 預設 false。
+5. **`GET /operator/message-quota`** —— O1 儀表板顯示額度所需，但 §10 未列出（規格缺口）。
 
-這四項讓「新增的 API 都在 03-API契約.md 有對應」這條 DoD 不成立。
+這五項讓「新增的 API 都在 03-API契約.md 有對應」這條 DoD 不成立。
 要回到純規格狀態，照各段落的移除方式處理即可。
+
+### 帳號密碼註冊／登入的設計與移除方式
+
+**為什麼要有**：LINE Login channel 與 Google OAuth client 都需要向外部申請，
+在那之前完全沒有人能登入系統，連驗收都做不了。
+
+**設計**（刻意做成最容易拔掉的形狀）：
+
+- 憑證存在**獨立的 `local_credential` 表**（`user_id` / `username` / `password_hash`），
+  `app_user` 維持與 `spec/schema.sql` **完全一致**，一個欄位都沒改。
+- 帳號以 `local:{username}` 寫進 `app_user.line_user_id`，
+  與 LINE（`U...`）和 Google（`google:...`）不會互相碰撞。
+- 密碼用 Node 內建 `scrypt`（隨機 salt、`timingSafeEqual` 比對），**沒有新增相依套件**。
+- 帳號不分大小寫，一律轉小寫存。
+- **帳號不存在與密碼錯誤回完全相同的 401**，不透露帳號是否存在（有測試用 `toEqual` 把關）。
+- **系統還沒有任何 operator 時，第一個註冊者自動成為管理員** ——
+  否則沒有 LINE 就沒人進得了後台（bootstrap 問題）。會在伺服器 log 留下 warn。
+- 以 `LOCAL_LOGIN_ENABLED` 控制，**預設 false**。
+- 這種帳號同樣**收不到 LINE 推播**（sender 會辨識 `local:` 前綴並記 FAILED）。
+
+**測試**：`tests/localAuth.test.ts` 19 個測項，涵蓋雜湊隨機性、密碼不落明文、
+第一個帳號升管理員、帳號重複、大小寫、密碼長度、錯誤訊息一致性、失敗不發 cookie、
+以及 `ON DELETE CASCADE`。
+
+**移除方式**（接上 LINE Login 之後）：
+
+```sql
+DROP TABLE local_credential;
+```
+
+再刪掉 `apps/api/src/lib/localAuth.ts`、`service.ts` 的
+`registerLocalUser`／`loginLocalUser`、`routes.ts` 的 `/auth/local/*` 兩支 route、
+`schema.prisma` 的 `LocalCredential` model 與 `AppUser.localCredential`、
+以及 C9 登入頁的表單區塊，最後把 `.env` 的 `LOCAL_LOGIN_ENABLED` 拿掉。
 
 ## Non-goals 確認（00 §C）
 

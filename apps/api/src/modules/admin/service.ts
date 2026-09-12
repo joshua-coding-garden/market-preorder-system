@@ -1,6 +1,7 @@
 import { prisma } from '../../lib/db.js'
 import { AppError, notFound } from '../../lib/errors.js'
 import { GOOGLE_USER_PREFIX } from '../../lib/googleLogin.js'
+import { LOCAL_USER_PREFIX } from '../../lib/localAuth.js'
 
 /**
  * ⚠️ 規格外：帳號與權限管理（委託方 2026-09-12 指示）。
@@ -18,12 +19,16 @@ import { GOOGLE_USER_PREFIX } from '../../lib/googleLogin.js'
 export type AccountRole = 'user' | 'operator'
 
 function describeAccount(lineUserId: string): {
-  provider: 'LINE' | 'GOOGLE'
+  provider: 'LINE' | 'GOOGLE' | 'LOCAL'
   loginId: string
 } {
-  return lineUserId.startsWith(GOOGLE_USER_PREFIX)
-    ? { provider: 'GOOGLE', loginId: lineUserId.slice(GOOGLE_USER_PREFIX.length) }
-    : { provider: 'LINE', loginId: lineUserId }
+  if (lineUserId.startsWith(GOOGLE_USER_PREFIX)) {
+    return { provider: 'GOOGLE', loginId: lineUserId.slice(GOOGLE_USER_PREFIX.length) }
+  }
+  if (lineUserId.startsWith(LOCAL_USER_PREFIX)) {
+    return { provider: 'LOCAL', loginId: lineUserId.slice(LOCAL_USER_PREFIX.length) }
+  }
+  return { provider: 'LINE', loginId: lineUserId }
 }
 
 export async function listAccounts() {

@@ -55,6 +55,10 @@ const envSchema = z.object({
     .string()
     .default('http://localhost:3000/api/auth/google/callback'),
 
+  // ⚠️ 規格外：帳號密碼註冊／登入（LINE channel 未就緒前的暫時通道）
+  //    正式環境接上 LINE Login 後請關閉
+  LOCAL_LOGIN_ENABLED: booleanish.default('false'),
+
   // ⚠️ 規格外：廠商後台的身分模擬功能。正式環境請保持 false
   ENABLE_IMPERSONATION: booleanish.default('false'),
 

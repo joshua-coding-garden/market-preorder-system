@@ -44,4 +44,6 @@ export function loadTestEnv(): void {
   process.env.JWT_SECRET ??= 'test-secret-value-that-is-long-enough-32'
   process.env.LINE_MESSAGING_CHANNEL_SECRET ||= 'test-line-channel-secret'
   process.env.LINE_LOGIN_CHANNEL_ID ||= 'test-login-channel-id'
+  // ⚠️ 規格外的帳密登入：測試需要它開著
+  process.env.LOCAL_LOGIN_ENABLED = 'true'
 }

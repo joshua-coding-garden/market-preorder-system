@@ -16,6 +16,7 @@ export async function resetDb(): Promise<void> {
       cart_item_component, cart_item, cart,
       listing, product_component, product,
       invite_code, participation, stall_member, stall,
+      local_credential,
       market_day, market,
       notification, broadcast, app_user
     RESTART IDENTITY CASCADE

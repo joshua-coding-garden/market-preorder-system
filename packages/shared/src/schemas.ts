@@ -33,6 +33,35 @@ export const lineCallbackQuerySchema = z.object({
 })
 export type LineCallbackQuery = z.infer<typeof lineCallbackQuerySchema>
 
+/**
+ * ⚠️ 規格外：帳號密碼註冊／登入（委託方指示的暫時通道）
+ * 帳號 3–20 碼英數與底線（不分大小寫，伺服器一律轉小寫）；密碼至少 8 碼。
+ */
+export const localUsernameSchema = z
+  .string()
+  .trim()
+  .min(3, '帳號至少 3 個字')
+  .max(20, '帳號最多 20 個字')
+  .regex(/^[A-Za-z0-9_]+$/, '帳號只能用英文、數字和底線')
+
+export const localPasswordSchema = z
+  .string()
+  .min(8, '密碼至少 8 個字')
+  .max(72, '密碼最多 72 個字')
+
+export const localRegisterSchema = z.object({
+  username: localUsernameSchema,
+  password: localPasswordSchema,
+  displayName: z.string().trim().min(1).max(50).optional(),
+})
+export type LocalRegisterInput = z.infer<typeof localRegisterSchema>
+
+export const localLoginSchema = z.object({
+  username: localUsernameSchema,
+  password: z.string().min(1, '請輸入密碼'),
+})
+export type LocalLoginInput = z.infer<typeof localLoginSchema>
+
 // ---------- §2 市集與場次 ----------
 
 /** GET /market-days（顧客用；只會回 PUBLISHED） */

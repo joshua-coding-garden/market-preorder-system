@@ -3,6 +3,7 @@ import { config } from '../../config.js'
 import { prisma } from '../db.js'
 import { AppError } from '../errors.js'
 import { GOOGLE_USER_PREFIX } from '../googleLogin.js'
+import { LOCAL_USER_PREFIX } from '../localAuth.js'
 import { MULTICAST_BATCH_SIZE, getLineClient, type LineMessage } from './client.js'
 
 /**
@@ -79,9 +80,13 @@ export async function estimateQuota(
   return { used, limit, estimate, allowed: used + estimate <= limit }
 }
 
-/** Google 暫時帳號收不到 LINE 推播（規格外的登入通道造成，見 NOTES） */
+/** Google／帳密的暫時帳號收不到 LINE 推播（規格外的登入通道造成，見 NOTES） */
 function isPushable(lineUserId: string): boolean {
-  return Boolean(lineUserId) && !lineUserId.startsWith(GOOGLE_USER_PREFIX)
+  return (
+    Boolean(lineUserId) &&
+    !lineUserId.startsWith(GOOGLE_USER_PREFIX) &&
+    !lineUserId.startsWith(LOCAL_USER_PREFIX)
+  )
 }
 
 export async function send(options: SendOptions): Promise<SendResult> {

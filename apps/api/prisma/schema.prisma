@@ -88,6 +88,7 @@ model AppUser {
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(6)
 
+  localCredential     LocalCredential?
   stallMemberships    StallMember[]
   carts               Cart[]
   preorders           Preorder[]
@@ -98,6 +99,21 @@ model AppUser {
   notifications       Notification[]
 
   @@map("app_user")
+}
+
+/// ⚠️ 規格外：帳號密碼登入的憑證（委託方 2026-09-12 指示）。
+/// 刻意獨立成一張表，app_user 維持與 spec/schema.sql 完全一致；
+/// 之後接上 LINE Login 時直接 DROP TABLE 即可移除乾淨。
+model LocalCredential {
+  userId       String   @id @map("user_id") @db.Uuid
+  username     String   @unique
+  /// scrypt：salt:hash（皆為 hex）
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("local_credential")
 }
 
 /// 市集（固定品牌／地點；邀請碼前綴來源）
