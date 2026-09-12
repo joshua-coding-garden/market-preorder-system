@@ -9,13 +9,30 @@ import {
   createParticipationSchema,
   createStallSchema,
   idParamSchema,
+  pickupLookupSchema,
   redeemInviteSchema,
+  stallDayParamSchema,
   stallIdParamSchema,
+  stallResourceParamSchema,
+  subOrderListQuerySchema,
   updateParticipationSchema,
   updateStallSchema,
+  updateSubOrderStatusSchema,
+  uuidSchema,
 } from '@market/shared'
 import type { AppError } from '../../lib/errors.js'
 import { assertOperator, assertStallMember, requireAuth } from '../../plugins/authz.js'
+import {
+  exportCsv,
+  getStallSubOrder,
+  listOperatorSubOrders,
+  listStallSubOrders,
+  lookupPickupCode,
+  markPickedUp,
+  operatorPrepSheet,
+  prepSheet,
+  setSubOrderStatus,
+} from './orderService.js'
 import {
   createParticipation,
   createStall,
@@ -28,6 +45,10 @@ import {
   updateParticipation,
   updateStall,
 } from './service.js'
+
+const operatorSubOrderQuerySchema = subOrderListQuerySchema.extend({
+  stallId: uuidSchema.optional(),
+})
 
 const stallRoutes: FastifyPluginAsync = async (app) => {
   // ---------------- 廠商：攤商管理 ----------------
@@ -116,6 +137,81 @@ const stallRoutes: FastifyPluginAsync = async (app) => {
     const { stallId } = stallIdParamSchema.parse(req.params)
     await assertStallMember(userId, stallId)
     return { items: await listStallMarketDays(stallId) }
+  })
+
+  // ---------------- 攤商：訂單、備貨、核銷（§8） ----------------
+
+  app.get('/stalls/:stallId/market-days/:dayId/sub-orders', async (req) => {
+    const userId = requireAuth(req)
+    const { stallId, dayId } = stallDayParamSchema.parse(req.params)
+    await assertStallMember(userId, stallId)
+    const { status } = subOrderListQuerySchema.parse(req.query)
+    return { items: await listStallSubOrders(stallId, dayId, status) }
+  })
+
+  app.get('/stalls/:stallId/sub-orders/:id', async (req) => {
+    const userId = requireAuth(req)
+    const { stallId, id } = stallResourceParamSchema.parse(req.params)
+    await assertStallMember(userId, stallId)
+    return getStallSubOrder(stallId, id)
+  })
+
+  app.get('/stalls/:stallId/market-days/:dayId/prep-sheet', async (req) => {
+    const userId = requireAuth(req)
+    const { stallId, dayId } = stallDayParamSchema.parse(req.params)
+    await assertStallMember(userId, stallId)
+    return prepSheet(stallId, dayId)
+  })
+
+  app.post('/stalls/:stallId/market-days/:dayId/pickup/lookup', async (req) => {
+    const userId = requireAuth(req)
+    const { stallId, dayId } = stallDayParamSchema.parse(req.params)
+    await assertStallMember(userId, stallId)
+    const { code } = pickupLookupSchema.parse(req.body)
+    return lookupPickupCode(stallId, dayId, code)
+  })
+
+  app.post('/stalls/:stallId/sub-orders/:id/pickup', async (req) => {
+    const userId = requireAuth(req)
+    const { stallId, id } = stallResourceParamSchema.parse(req.params)
+    await assertStallMember(userId, stallId)
+    return markPickedUp(stallId, id, userId)
+  })
+
+  app.patch('/stalls/:stallId/sub-orders/:id/status', async (req) => {
+    const userId = requireAuth(req)
+    const { stallId, id } = stallResourceParamSchema.parse(req.params)
+    await assertStallMember(userId, stallId)
+    const { status } = updateSubOrderStatusSchema.parse(req.body)
+    return setSubOrderStatus(stallId, id, status)
+  })
+
+  // ---------------- 廠商：訂單總覽與匯出（§9） ----------------
+
+  app.get('/operator/market-days/:id/sub-orders', async (req) => {
+    const userId = requireAuth(req)
+    await assertOperator(userId)
+    const { id } = idParamSchema.parse(req.params)
+    const query = operatorSubOrderQuerySchema.parse(req.query)
+    return { items: await listOperatorSubOrders(id, query) }
+  })
+
+  app.get('/operator/market-days/:id/prep-sheet', async (req) => {
+    const userId = requireAuth(req)
+    await assertOperator(userId)
+    const { id } = idParamSchema.parse(req.params)
+    return operatorPrepSheet(id)
+  })
+
+  app.get('/operator/market-days/:id/export.csv', async (req, reply) => {
+    const userId = requireAuth(req)
+    await assertOperator(userId)
+    const { id } = idParamSchema.parse(req.params)
+    const csv = await exportCsv(id)
+    reply
+      .header('content-type', 'text/csv; charset=utf-8')
+      .header('content-disposition', `attachment; filename="orders-${id}.csv"`)
+    return csv
   })
 }
 

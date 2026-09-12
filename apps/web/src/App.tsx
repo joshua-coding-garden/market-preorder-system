@@ -17,13 +17,18 @@ import MarketDayDetail from '@/routes/operator/MarketDayDetail'
 import MarketDays from '@/routes/operator/MarketDays'
 import Markets from '@/routes/operator/Markets'
 import Permissions from '@/routes/operator/Permissions'
+import OperatorDayOrders from '@/routes/operator/DayOrders'
 import OperatorStalls from '@/routes/operator/Stalls'
 import Placeholder from '@/routes/Placeholder'
 import StallLayout from '@/routes/stall/Layout'
 import StallHome from '@/routes/stall/StallHome'
 import StallListings from '@/routes/stall/Listings'
 import StallProductEdit from '@/routes/stall/ProductEdit'
+import StallPickup from '@/routes/stall/Pickup'
+import StallPrepSheet from '@/routes/stall/PrepSheet'
 import StallProducts from '@/routes/stall/Products'
+import StallSubOrderDetail from '@/routes/stall/SubOrderDetail'
+import StallSubOrders from '@/routes/stall/SubOrders'
 import Redeem from '@/routes/stall/Redeem'
 import { RequireCapability } from '@/routes/guard'
 
@@ -66,22 +71,10 @@ export default function App() {
             <Route path=":stallId/products" element={<StallProducts />} />
             <Route path=":stallId/products/:id" element={<StallProductEdit />} />
             <Route path=":stallId/days/:dayId/listings" element={<StallListings />} />
-            <Route
-              path=":stallId/days/:dayId/orders"
-              element={<Placeholder screen="訂單列表" sprint={4} />}
-            />
-            <Route
-              path=":stallId/sub-orders/:id"
-              element={<Placeholder screen="訂單詳情" sprint={4} />}
-            />
-            <Route
-              path=":stallId/days/:dayId/prep"
-              element={<Placeholder screen="備貨總表" sprint={4} />}
-            />
-            <Route
-              path=":stallId/days/:dayId/pickup"
-              element={<Placeholder screen="核銷" sprint={4} />}
-            />
+            <Route path=":stallId/days/:dayId/orders" element={<StallSubOrders />} />
+            <Route path=":stallId/sub-orders/:id" element={<StallSubOrderDetail />} />
+            <Route path=":stallId/days/:dayId/prep" element={<StallPrepSheet />} />
+            <Route path=":stallId/days/:dayId/pickup" element={<StallPickup />} />
             <Route
               path=":stallId/broadcasts"
               element={<Placeholder screen="推播申請" sprint={6} />}
@@ -115,10 +108,7 @@ export default function App() {
             <Route path="days/:id" element={<MarketDayDetail />} />
             <Route path="stalls" element={<OperatorStalls />} />
             <Route path="permissions" element={<Permissions />} />
-            <Route
-              path="days/:id/orders"
-              element={<Placeholder screen="訂單總覽" sprint={4} />}
-            />
+            <Route path="days/:id/orders" element={<OperatorDayOrders />} />
             <Route path="broadcasts" element={<Placeholder screen="推播審核" sprint={6} />} />
             <Route
               path="broadcasts/:id"

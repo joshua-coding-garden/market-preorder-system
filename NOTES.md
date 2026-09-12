@@ -317,3 +317,53 @@ LINE Login 的 Callback URL 必須是外部連得到的 HTTPS 網址，`localhos
    避免「加入購物車後攤商改價」造成金額不一致。
 3. **`idempotencyKey` 存在 sessionStorage**，同一分頁重整不會換 key；
    成功後才清除，因此重整結帳頁重送也是安全的。
+
+---
+
+## Sprint 4｜攤商訂單、即時推送、備貨總表、核銷
+
+日期：2026-09-12
+
+### 完成項目
+
+- **API §8**：子單列表／單筆、備貨總表、`pickup/lookup`、`pickup`、狀態變更。
+- **API §9**：廠商跨攤訂單總覽、合併備貨表、`export.csv`（UTF-8 with BOM）。
+- **socket.io（§11、D-08）**：`plugins/socket.ts` 掛在同一個 HTTP server；
+  連線用 cookie 驗證，`stall:join` 由伺服器查 `stall_member` 後才加入 room（operator 可加入任意攤）；
+  事件來源是 `lib/events.ts`，service 層不直接碰 socket。
+- **子單狀態機（04 §B）**：`PENDING → PICKED_UP／NO_SHOW／CANCELLED`，終態不可再轉；
+  核銷用 `updateMany where status='PENDING'` 做併發保護，只有搶到的那一次算數。
+- **畫面**：S6 訂單列表（socket 即時 + 60 秒 polling 備援 + 連線狀態指示 + 新單閃爍）、
+  S7 訂單詳情（電話可點撥號、三個狀態按鈕）、S8 備貨總表（兩層、收到 `prep:changed` 自動重抓）、
+  S9 核銷（4 格大字輸入、自動大寫與跳格、按鈕 ≥ 56px）、O6 訂單總覽（篩選、CSV、合併備貨表）。
+
+### 驗收結果（07 §S4）
+
+| # | 項目 | 結果 |
+|---|---|---|
+| S4-1 | 另一裝置下單後 3 秒內出現新單並閃爍 | ✅ `[auto]` 伺服器端已驗證：join room 後收到 `order:new` 與 `prep:changed`，payload 正確；`[manual]` 雙裝置實測待手機驗收 |
+| S4-2 | socket 斷線後 60 秒 polling 補上 | ✅ 已實作（`POLL_INTERVAL_MS = 60_000`）並顯示連線狀態；`[manual]` 待手機驗收 |
+| S4-3 | A 的子單列表只含 A 的子單 | ✅ `[auto]` 另驗回應不含對方商品名 |
+| S4-4 | A 打 B 的每個 §4/§5/§8 端點 → 全部 403 | ✅ `[auto]` **逐一打過 15 支端點**，每支都驗 403 且 body 不含 B 的商品名、攤商名、取貨碼 |
+| S4-5 | 備貨表：可頌 3、吐司 1；加起司 2 | ✅ `[auto]` |
+| S4-6 | NO_SHOW 不計入備貨 | ✅ `[auto]` 另驗 CANCELLED 不計、PICKED_UP 仍計 |
+| S4-7 | 正確碼 → 200 回子單摘要 | ✅ `[auto]` 另驗小寫輸入也查得到 |
+| S4-8 / S4-9 | 別攤的碼與亂碼回**完全相同**的 404 | ✅ `[auto]` 用 `toEqual` 比對兩個回應完全一致 |
+| S4-10 | PENDING → PICKED_UP，記時間並發 socket | ✅ `[auto]` 驗 `picked_up_by_user_id` 與事件 payload |
+| S4-11 | 重複核銷 → 409 且時間不變 | ✅ `[auto]` |
+| S4-12 | 場次 CLOSED 後核銷 → 409 | ✅ `[auto]` |
+| S4-13 | 2 PENDING + 1 PICKED_UP → `{ noShowCount: 2 }` | ✅ `[auto]` 三張子單狀態逐一驗證 |
+| S4-14 | CSV 中文正常（BOM）、欄位如 §9 | ✅ `[auto]` 驗 BOM、表頭字串完全相符、含逗號欄位正確引號包住；`[manual]` Excel 實際開啟待驗 |
+| S4-15 | S9 四格自動跳格、自動大寫、按鈕 ≥ 56px | ✅ 已實作（`minHeight: 56`、`autoCapitalize`、跳格與 Backspace 回退）；`[manual]` 戶外實測待驗 |
+
+`pnpm typecheck` ✅　`pnpm lint` ✅　`pnpm test` ✅ 116/116
+（新增 authz 5 + prep-sheet 8 + pickup 11 + socket 5）
+
+### 實作決定
+
+1. **`socket.test.ts` 不在規格的測試檔清單內**，但 S4-1／S4-2 是 `[manual]` 且依賴兩台裝置。
+   伺服器端能不能正確推送是可以自動驗的，所以加了這支；手機端的視覺行為仍留給手動驗收。
+2. **查碼失敗一律回同一個回應**：測試用 `toEqual` 比對「別攤的碼」與「亂碼」的完整回應，
+   避免日後有人加上不同的 message 而造成可以探測別攤取貨碼。
+3. **CSV 用 fetch 取回再存成 Blob**，不是直接開連結 —— 這樣才帶得到 session cookie，
+   也才能把 403 當成錯誤處理。

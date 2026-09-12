@@ -6,6 +6,7 @@ import { config } from './config.js'
 import { MAX_IMAGE_BYTES } from './lib/image.js'
 import authPlugin from './plugins/auth.js'
 import errorPlugin from './plugins/error.js'
+import socketPlugin from './plugins/socket.js'
 import adminRoutes from './modules/admin/routes.js'
 import authRoutes from './modules/auth/routes.js'
 import marketRoutes from './modules/market/routes.js'
@@ -59,6 +60,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(marketRoutes, { prefix: '/api' })
   await app.register(productRoutes, { prefix: '/api' })
   await app.register(orderRoutes, { prefix: '/api' })
+
+  // socket.io 掛在同一個 HTTP server 上（03 §11）
+  await app.register(socketPlugin)
   await app.register(stallRoutes, { prefix: '/api' })
   await app.register(adminRoutes, { prefix: '/api' })
 
