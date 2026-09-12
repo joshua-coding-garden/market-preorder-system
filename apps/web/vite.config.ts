@@ -23,6 +23,19 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: false,
       },
+      '/uploads': { target: 'http://localhost:3000', changeOrigin: false },
+      '/socket.io': { target: 'http://localhost:3000', ws: true, changeOrigin: false },
+    },
+  },
+  // `vite preview` 用來驗證 production build（S7-5 效能量測）
+  preview: {
+    port: 4173,
+    host: true,
+    allowedHosts: ['.ngrok-free.app', '.ngrok-free.dev', '.ngrok.app', '.ngrok.io'],
+    proxy: {
+      '/api': { target: 'http://localhost:3000', changeOrigin: false },
+      '/uploads': { target: 'http://localhost:3000', changeOrigin: false },
+      '/socket.io': { target: 'http://localhost:3000', ws: true, changeOrigin: false },
     },
   },
 })

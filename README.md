@@ -133,7 +133,9 @@ COOKIE_SECURE=false
 | `pnpm db:up` / `pnpm db:down` | 啟動／停止本機 PostgreSQL |
 | `pnpm db:migrate` | 套用 migration（`prisma migrate deploy`） |
 | `pnpm db:migrate:dev` | 開發時新增 migration |
-| `pnpm db:seed` | 匯入開發假資料（可重複執行） |
+| `pnpm db:seed` | 匯入開發假資料（可重複執行，對應 spec/schema.sql 的 Seed 段） |
+| `pnpm db:seed:demo` | 匯入**展示測資**：5 攤商、10 商品、三種狀態場次、10 組邀請碼 |
+| `pnpm line:richmenu` | 建立 LINE 圖文選單（需先設定 Messaging API） |
 | `pnpm db:reset` | **刪掉資料庫 volume** 後重建（資料全失） |
 | `pnpm db:studio` | 開 Prisma Studio 看資料 |
 
@@ -194,16 +196,48 @@ docker exec -it market-preorder-db psql -U market -d market_preorder \
 
 ## 環境變數
 
-完整清單見 [`.env.example`](.env.example)。Sprint 0 只需要下列項目即可啟動：
+完整清單與註解見 [`.env.example`](.env.example)。
+
+**基本（沒有就起不來）**
 
 | 變數 | 說明 |
 |---|---|
 | `DATABASE_URL` | 開發資料庫連線字串 |
-| `TEST_DATABASE_URL` | 測試資料庫連線字串（不可與上者相同） |
+| `TEST_DATABASE_URL` | 測試資料庫連線字串，**不可與上者相同**（測試會清空資料） |
 | `JWT_SECRET` | 自簽 session JWT 的密鑰，32 字元以上 |
-| `WEB_URL` | 前端對外網址，LINE 登入完成後導回這裡 |
+| `WEB_URL` | 前端對外網址；LINE 登入完成後導回這裡，推播按鈕也用它 |
+| `COOKIE_SECURE` | HTTPS 環境設 `true`；純 `http://localhost` 必須是 `false` |
+
+**LINE 登入（顧客與攤商登入必需）**
+
+| 變數 | 說明 |
+|---|---|
 | `LINE_LOGIN_CHANNEL_ID` / `LINE_LOGIN_CHANNEL_SECRET` | LINE Login channel |
-| `LINE_LOGIN_CALLBACK_URL` | 必須與 LINE Console 設定一致 |
+| `LINE_LOGIN_CALLBACK_URL` | 必須與 LINE Console 設定**完全一致** |
+
+**LINE 推播（新訂單通知、取貨提醒、推播功能）**
+
+| 變數 | 說明 |
+|---|---|
+| `LINE_MESSAGING_CHANNEL_SECRET` | webhook 簽章驗證用 |
+| `LINE_MESSAGING_CHANNEL_ACCESS_TOKEN` | 送訊息用 |
+| `LIFF_ID` | LINE 內建瀏覽器免重複登入 |
+| `LINE_MONTHLY_MESSAGE_QUOTA` | LINE quota API 取不到時的月額度上限（預設 200） |
+| `PICKUP_REMINDER_HOUR` | 當日取貨提醒的時間，台北整點（預設 8） |
+
+**圖片儲存**
+
+| 變數 | 說明 |
+|---|---|
+| `STORAGE_DRIVER` | `local`（預設，存本機）或 `s3`（**尚未實作**，見 NOTES） |
+| `UPLOAD_DIR` | `local` 時的存放目錄 |
+
+**⚠️ 規格外的暫時設定**（見 [`NOTES.md`](NOTES.md) 的說明與移除方式）
+
+| 變數 | 說明 |
+|---|---|
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_CALLBACK_URL` | 暫時的 Google 登入通道 |
+| `ENABLE_IMPERSONATION` | 廠商後台的身分模擬。**正式環境請保持 `false`** |
 
 ---
 
@@ -215,11 +249,14 @@ market-preorder/
 │   ├── api/                 Fastify 後端
 │   │   ├── src/
 │   │   │   ├── modules/     每個領域一個資料夾（auth, market, stall, product, order, broadcast, line）
-│   │   │   ├── plugins/     auth 驗證、錯誤處理（socket.io 於 Sprint 4）
-│   │   │   ├── lib/         db、jwt、line、time
+│   │   │   ├── plugins/     auth、authz、錯誤處理、socket.io
+│   │   │   ├── lib/         db、jwt、line/（client・sender・messages）、image、
+│   │   │   │                pickupCode、inviteCode、events、time
+│   │   │   ├── jobs/        inviteExpire、inviteRecycle、pickupReminder
 │   │   │   └── server.ts
-│   │   ├── prisma/          schema.prisma、migrations、seed.ts
-│   │   └── tests/
+│   │   ├── prisma/          schema.prisma、migrations、seed.ts、seed-demo.ts
+│   │   ├── scripts/         richmenu.ts
+│   │   └── tests/           14 個測試檔，159 測項
 │   └── web/                 React 前端（顧客／攤商／廠商三個 view 用路由分）
 │       └── src/
 │           ├── routes/      customer/  stall/  operator/
@@ -228,6 +265,8 @@ market-preorder/
 │           └── store/
 ├── packages/
 │   └── shared/              zod schema、共用型別、狀態列舉、錯誤碼
+├── docs/                    三份操作說明（顧客／攤商／廠商）
+├── scripts/tunnel.mjs       ngrok 通道 + 自動寫回 .env
 ├── docker-compose.yml       本機 PostgreSQL
 └── .env.example
 ```
@@ -276,15 +315,27 @@ market-preorder/
 
 ---
 
+## 給使用者的操作說明
+
+非工程師看這三份就夠了：
+
+- [顧客操作說明](docs/操作說明-顧客.md)
+- [攤商操作說明](docs/操作說明-攤商.md)
+- [廠商操作說明](docs/操作說明-廠商.md)
+
+---
+
 ## 開發進度
 
 依 `../spec/06-迭代計畫.md` 逐 Sprint 進行，每個 Sprint 的驗收結果記在 [`NOTES.md`](NOTES.md)。
 
 - [x] Sprint 0：骨架（LINE 登入、場次列表、權限函式、測試骨架）
-- [ ] Sprint 1：廠商 CMS（市集、場次、攤商、邀請碼）
-- [ ] Sprint 2：商品、內容物、圖片、本場上架
-- [ ] Sprint 3：購物車、下單、拆單、取貨碼
-- [ ] Sprint 4：攤商訂單、即時推送、備貨總表、核銷
-- [ ] Sprint 5：LINE Bot 與系統通知
-- [ ] Sprint 6：推播申請與審核
-- [ ] Sprint 7：硬化與交付
+- [x] Sprint 1：廠商 CMS（市集、場次、攤商、邀請碼）
+- [x] Sprint 2：商品、內容物、圖片、本場上架
+- [x] Sprint 3：購物車、下單、拆單、取貨碼
+- [x] Sprint 4：攤商訂單、即時推送、備貨總表、核銷
+- [x] Sprint 5：LINE Bot 與系統通知
+- [x] Sprint 6：推播申請與審核
+- [x] Sprint 7：硬化與交付（**手動驗收項目待委託方執行**，見 NOTES.md）
+
+`05-畫面規格.md` 的 27 個畫面全部實作完成；自動測試 159 項全綠。

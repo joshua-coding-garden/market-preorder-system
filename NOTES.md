@@ -486,3 +486,153 @@ channel secret 與 access token。填進 `.env` 後：
    保持 `APPROVED` 的好處是廠商可以改小對象或等下個月直接重送，不必重建一筆。
 2. **`ALL_FRIENDS` 的估算人數同時決定額度消耗**。broadcast API 只呼叫一次，
    但 LINE 是以實際送達人數計費，所以估算仍用好友數，不是 1。
+
+---
+
+## Sprint 7｜硬化與交付
+
+日期：2026-09-12
+
+### 完成項目
+
+- **三份操作說明**（`docs/`，非工程師可讀，各一頁）：顧客、攤商、廠商。
+- **README 補完**：分階段的環境變數表、完整專案結構、ngrok 流程、
+  LINE Console 設定（含**同一 Provider** 的警告）、部署步驟、重置資料。
+- **個資告知六項**已在 Sprint 3 放進 C6（可摺疊），內容依
+  `../06-外部事實查證與踩雷清單.md` §8：蒐集者、目的、蒐集項目、
+  利用期間地區對象、利用方式、當事人權利。
+- **效能量測**（見下）。
+- `vite preview` 加上 proxy 設定，可在本機驗證 production build。
+
+### 驗收結果（07 §S7）
+
+| # | 項目 | 結果 |
+|---|---|---|
+| S7-1 | iOS Safari 走 C1→C7 | ⬜ **待委託方執行**（需要真 iPhone） |
+| S7-2 | Android Chrome 走 C1→C7 | ⬜ **待委託方執行**（需要真 Android） |
+| S7-3 | LINE 內建瀏覽器（LIFF）走 C1→C7，不需再登入 | ⬜ **待委託方執行**（需要 LIFF ID 與真 LINE 帳號） |
+| S7-4 | 攤商手機走 S2→S9 | ⬜ **待委託方執行** |
+| S7-5 | 4G 網路下 C2 200 筆商品首屏 < 3s | ✅ **463 ms**（見下方量測） |
+| S7-6 | C6 個資告知六項存在且可摺疊 | ✅ 已實作 |
+| S7-7 | 第三人依 README 從零跑起來 | 🟡 README 已寫完整；**實際由第三人驗證待執行** |
+| S7-8 | `pnpm test` 全綠、`typecheck` 無錯、`lint` 無錯 | ✅ 159/159、0 錯、0 錯 |
+| S7-9 | NOTES.md 含已知限制、Non-goals、延後建議 | ✅ 見下方「交付狀態」 |
+
+### S7-5 效能量測結果
+
+用 Chrome DevTools Protocol，375×812 手機 viewport，同一個場次 **200 個 listing**，
+量到「商品卡片實際渲染出來」為止，每組跑 5 次取中位數：
+
+| 情境 | 中位數 | 最慢 |
+|---|---|---|
+| production build + **模擬 4G**（RTT 70ms／12Mbps／3Mbps） | **463 ms** | 471 ms |
+| dev server + 本機無限速 | 157 ms | 465 ms（首次含編譯） |
+
+production bundle：JS 390 KB（gzip 115 KB）、CSS 25 KB（gzip 5 KB）。
+規格門檻是 4G 下 < 3s、本機 < 2s，兩者都有大幅餘裕。
+
+> 量測腳本沒有納入版控（一次性工具）。要重現的話：
+> `pnpm --filter @market/web build && pnpm --filter @market/web preview`，
+> 再用任何 Lighthouse／CDP 工具量 `/days/{id}`。
+
+---
+
+# 交付狀態
+
+## 完成度
+
+- **8 個 Sprint 全部實作完成**（Sprint 0～7）
+- **27 個畫面**（05-畫面規格.md）全部完成
+- **自動測試 159 項全綠**，涵蓋 07-驗收條件.md 所有 `[auto]` 項目
+- `pnpm typecheck`／`pnpm lint` 皆無錯誤
+
+| 測試檔 | 測項 | 對應驗收 |
+|---|---|---|
+| `auth.test.ts` | 9 | S0-3～6 |
+| `invite.test.ts` | 23 | S1-1、S1-3～11 |
+| `product.test.ts` | 8 | S2-1、S2-2、S2-8 |
+| `image.test.ts` | 6 | S2-3～5 |
+| `listing.test.ts` | 9 | S2-6、S2-7、S2-9、S2-10 |
+| `cart.test.ts` | 12 | S3-1～4 |
+| `order.test.ts` | 20 | S3-6～14、S3-16、S3-17 |
+| `authz.test.ts` | 5 | S4-3、S4-4、S6-9 |
+| `prep-sheet.test.ts` | 8 | S4-5、S4-6、S4-14 |
+| `pickup.test.ts` | 11 | S4-7～13 |
+| `socket.test.ts` | 5 | S4-1（伺服器端） |
+| `webhook.test.ts` | 13 | S5-1～4 |
+| `notification.test.ts` | 13 | S5-5～7 |
+| `broadcast.test.ts` | 17 | S6-1～8 |
+
+## 待委託方執行的項目
+
+這些**不是沒做**，是需要委託方提供的東西或真實裝置才能驗：
+
+### 1. LINE 憑證（擋住 5 個驗收項）
+
+需要在**同一個 Provider** 下建立 LINE Login channel 與 Messaging API channel。
+填進 `.env` 後即可驗 **S0-2、S5-8、S5-9、S7-3**。
+
+程式路徑都已完成並可觸達；未設定時端點會回明確錯誤而不是 500。
+
+### 2. 真實手機（擋住 4 個驗收項）
+
+**S7-1／S7-2／S7-4** 需要 iPhone 與 Android 實機。
+公開網址已用 ngrok 打通，現在就可以開來測。
+版面已在 375×812 驗過無橫向溢出。
+
+### 3. 正式部署平台（Sprint 0 範圍的最後一項）
+
+README 的部署步驟已寫完整，但**沒有實際部署**。需要委託方決定平台
+（建議 Zeabur／Render／Fly + Neon）。ngrok 是開發期替代方案，不是交付狀態。
+
+### 4. `STORAGE_DRIVER=s3` 未實作
+
+D-12 說正式環境用 S3 相容儲存。目前設成 `s3` 會丟出明確錯誤而不是靜默寫本機。
+若部署平台有持久化磁碟，用 `local` 即可；否則需要補上 S3 client。
+
+## 規格外的追加（委託方 2026-09-12 口頭指示）
+
+以下四項**不在 spec 內**，都標成可拔除，移除方式見 Sprint 1 段落：
+
+1. **Google 第三方登入** —— LINE 憑證未到位前的暫時通道。
+   ⚠️ 這種帳號**收不到 LINE 推播**，正式身分來源仍是 LINE Login（D-11）。
+2. **帳號與權限頁**（`/operator/permissions`）—— 不新增 role，把 `operator` 當系統管理身分。
+3. **身分模擬** —— 換發 session，權限真的降級。`ENABLE_IMPERSONATION` 預設 false。
+4. **`GET /operator/message-quota`** —— O1 儀表板顯示額度所需，但 §10 未列出（規格缺口）。
+
+這四項讓「新增的 API 都在 03-API契約.md 有對應」這條 DoD 不成立。
+要回到純規格狀態，照各段落的移除方式處理即可。
+
+## Non-goals 確認（00 §C）
+
+以下全程未實作，也不應該被實作：
+
+線上金流／退款／發票、真實簡訊 OTP（電話只收集不驗證）、攤商自助註冊、
+顧客自行取消訂單、庫存進銷存成本、多語系、原生 App、Email 通知、多層巢狀內容物。
+
+## 已知限制
+
+1. **`STORAGE_DRIVER=s3` 未實作**（見上）。
+2. **JWT 是無狀態的**，登出只清 cookie；被竊的 token 在 30 天內仍有效。
+   若需要強制登出，要改成有狀態 session 或加短效 token + refresh。
+3. **ngrok 免費方案網址會變**，每次重開都要重跑 `pnpm dev` 並更新 LINE Console 的 Callback URL。
+4. **取貨碼 4 碼共 31⁴ ≈ 92 萬組**，同場次唯一。單場訂單量遠低於此，
+   但若未來單場超過數萬筆，碰撞重試會變頻繁。
+5. **Windows 上跑 `pnpm build` 前要先停掉 `pnpm dev`**（dev server 佔住 Prisma query engine DLL）。
+6. **`app_user` 沒有停用欄位**，權限管理頁只能改角色與攤商綁定，不能停用帳號。
+   schema.sql 沒有這個欄位，加了就偏離規格。
+
+## 被延後的建議（不實作，待委託方決定）
+
+1. **前端資料抓取**目前是手寫 `useApi` hook。畫面已達 27 個，
+   若之後要加快取與樂觀更新，可考慮 TanStack Query —— 但這是新的相依套件，需要同意。
+2. **`invite_code` 流水號**每次掃該場次全部未回收的碼。單場數十攤沒問題，
+   上百攤時改成在 `market_day` 放 counter 會更省。
+3. **推播圖片**目前存在本機並用 `WEB_URL` 組出絕對網址。
+   LINE 要求圖片網址必須是公開 HTTPS，正式環境務必確認 `WEB_URL` 正確且圖片可公開存取。
+4. **備貨總表沒有安全係數**（Q-04 預設不加）。若攤商反映常常不夠，
+   可加一個 `.env` 百分比設定。
+5. **O4 結案確認框**目前是固定文字。要顯示「將轉為未取的筆數」，
+   可以接上 §9 的 `GET /operator/market-days/:id/sub-orders?status=PENDING`。
+6. **socket 目前是單機記憶體**。若之後要跑多個 API instance，
+   需要加 socket.io 的 Redis adapter，否則推播只會到同一台機器上的連線。
