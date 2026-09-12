@@ -6,16 +6,24 @@ const ISSUER = 'market-preorder'
 const AUDIENCE = 'market-preorder-web'
 
 export interface SessionPayload {
-  /** app_user.id */
+  /** app_user.id（模擬中就是被模擬者） */
   sub: string
+  /**
+   * ⚠️ 規格外：身分模擬中的原始 operator id。
+   * 有值代表這個 session 是模擬出來的，可以用它還原回去。
+   */
+  imp?: string
 }
 
 /**
  * 簽發自家 session JWT（D-11）。
  * 注意：LINE 的 access token 不放進 payload，也不交給前端。
  */
-export async function signSession(userId: string): Promise<string> {
-  return new SignJWT({})
+export async function signSession(
+  userId: string,
+  impersonatorId?: string,
+): Promise<string> {
+  return new SignJWT(impersonatorId ? { imp: impersonatorId } : {})
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(userId)
     .setIssuer(ISSUER)
@@ -34,7 +42,10 @@ export async function verifySession(token: string): Promise<SessionPayload | nul
       algorithms: ['HS256'],
     })
     if (typeof payload.sub !== 'string' || payload.sub.length === 0) return null
-    return { sub: payload.sub }
+    return {
+      sub: payload.sub,
+      imp: typeof payload.imp === 'string' ? payload.imp : undefined,
+    }
   } catch {
     return null
   }

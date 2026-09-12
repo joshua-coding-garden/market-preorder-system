@@ -126,3 +126,88 @@ LINE Login 的 Callback URL 必須是外部連得到的 HTTPS 網址，`localhos
 5. **`.env` 的 `TZ=Asia/Taipei`**：目前時間換算全部在程式內用固定 UTC+8 處理
    （`lib/time.ts`），不依賴行程時區，因此換到任何時區的機器都正確。
    `TZ` 只影響 log 顯示。
+
+---
+
+## Sprint 1｜廠商 CMS：市集、場次、攤商、邀請碼
+
+日期：2026-09-12
+
+### 完成項目
+
+- **API §2 operator 全部**：`GET/POST /operator/markets`、`GET/POST /operator/market-days`、
+  `PATCH /operator/market-days/:id`、`publish`／`unpublish`／`close`。
+- **API §3 全部**：`GET/POST /operator/stalls`、`PATCH /operator/stalls/:id`、
+  參與的 CRUD（建立時自動產碼）、`invite-codes/reissue`、`POST /stall/invite-codes/redeem`、
+  `GET /stalls/:stallId/market-days`。
+- **場次狀態機（04 §A）**：`DRAFT → PUBLISHED → CLOSED`；close 的三個副作用
+  （PENDING 子單轉 NO_SHOW、`closed_at`、該場 ACTIVE 邀請碼轉 EXPIRED）都在同一個交易內。
+  另抽出 `assertMarketDayWritable()`，CLOSED 後所有寫入端點一律 409（Sprint 0 NOTES 的建議 2 已落實）。
+- **邀請碼（D-03 / 04 §C）**：`lib/inviteCode.ts` 負責產碼、流水號、撞碼重試（最多 20 次）。
+  流水號取「該場次尚未回收的最大流水號 + 1」，因此回收後字串可以重新配發。
+- **排程（04 §G）**：`inviteExpire`（每小時）、`inviteRecycle`（每天 03:00 台北），
+  以 node-cron 在 `server.ts` 啟動，job 本身是純函式可獨立測試。
+- **畫面**：O2 市集、O3 場次列表（狀態 tab + 新增）、O4 場次詳情（參與攤商表、邀請碼複製／重發／移除、
+  發布／取消發布／結案）、O5 攤商管理、S1 攤商首頁、S2 邀請碼綁定。
+
+### 驗收結果（07 §S1）
+
+| # | 項目 | 結果 |
+|---|---|---|
+| S1-1 | 新增市集 `code=B`；`code=b` 被拒 | ✅ `[auto]` 小寫回 400 VALIDATION、大寫回 201、重複回 409 |
+| S1-2 | 新增場次 → DRAFT，顧客端看不到 | ✅ `[auto]` DRAFT 不在 `/market-days`；`[manual]` O3 建立後狀態為未發布 |
+| S1-3 | 加入攤商 → 邀請碼 `B{YYYYMMDD}-0001` | ✅ `[auto]` 格式、`expires_at`（當天 23:59:59 台北）、`recyclable_at`（+60 天）全部驗證 |
+| S1-4 | 攤位重複 409；改攤位成功且碼為 `-0002` | ✅ `[auto]` |
+| S1-5 | 兌換 → 200、`stall_member` +1、碼 REDEEMED | ✅ `[auto]` 另驗 `/me` 的 `capabilities.stall` 由 false 變 true |
+| S1-6 | 同一碼再兌換 → 400 `INVITE_INVALID` | ✅ `[auto]` 另驗回應不洩漏攤商名稱 |
+| S1-7 | EXPIRED 的碼 → 訊息與 S1-6 完全相同 | ✅ `[auto]` 三種失敗情況訊息皆為「邀請碼無效或已使用」 |
+| S1-8 | `inviteExpire` job | ✅ `[auto]` 含冪等測試 |
+| S1-9 | `inviteRecycle` 後 reissue 產出相同字串 | ✅ `[auto]` 驗證兩筆同字串並存且只有一筆非 RECYCLED |
+| S1-10 | 無 participation 不能發布 | ✅ `[auto]` 400；加一攤後發布成功且 C1 出現 |
+| S1-11 | 有 preorder 時 unpublish → 409 | ✅ `[auto]` |
+| S1-12 | 攤商登入 → S1 看到攤商與場次 | ✅ `[manual]` 以模擬身分驗過；真 LINE 帳號待憑證 |
+
+`pnpm typecheck` ✅　`pnpm lint` ✅　`pnpm test` ✅ 32/32（`auth` 9 + `invite` 23）
+
+### 展示測資（`pnpm db:seed:demo`）
+
+規格的 `pnpm db:seed` 嚴格對應 `schema.sql` 的 Seed 段，不能擴充；
+另外加了一支 `pnpm db:seed:demo` 疊上實際能點的測資，可重複執行：
+
+- 5 家攤商、10 項商品（含內容物與加價）
+- 三種狀態的場次各一：本週 PUBLISHED（5 攤、可下單）、下週 DRAFT（3 攤、顧客看不到）、
+  上週 CLOSED（2 攤、唯讀）
+- 邀請碼共 10 組，執行後直接印在終端機
+
+### ⚠️ 規格外的追加（委託方 2026-09-12 口頭指示）
+
+以下三項**不在 spec 內**，是委託方在 Sprint 1 進行中要求的。全部標成可拔除：
+
+1. **Google 第三方登入**（`/auth/google/*`）
+   - 原因：LINE channel 憑證尚未取得，需要能先登入測試。
+   - 做法：Google 帳號以 `google:{sub}` 寫進 `app_user.line_user_id`，不改資料表。
+     ID token 用 Google JWKS 在伺服器端驗證（含 aud／iss／nonce）。
+   - **限制**：這種帳號**收不到 LINE 推播**（Sprint 5 的 sender 會跳過）。
+     正式身分來源仍是 LINE Login（D-11）。
+   - 移除方式：刪掉 `lib/googleLogin.ts`、`/auth/google/*` 兩支 route、
+     `service.ts` 的 `upsertUserFromGoogle`、C9 的 Google 按鈕，並清掉 `.env` 三個變數。
+2. **帳號與權限頁**（`/operator/permissions`，API `/operator/accounts*`）
+   - 規格 D-01 沒有第四種角色，因此**不新增 role 列舉**，直接把 `operator` 當系統管理身分。
+   - 安全規則：不能更改自己的權限；系統一定保留至少一位管理員。
+   - 權限判斷每次重查資料庫（B-1），所以改權限對既有 session 立即生效。
+3. **身分模擬**（`/operator/impersonation`）
+   - 換發 session JWT（帶 `imp` claim 記住原管理員），**權限是真的降級**，
+     所有 `assert*` 照常在後端生效 —— 不是前端隱藏按鈕。已實測：
+     模擬一般使用者時打 `/operator/accounts` 回 **403**，結束模擬後回 200。
+   - 可模擬「未登入的訪客」：清掉 session，還原資訊留在獨立的 `mp_impersonator` cookie。
+   - **以 `ENABLE_IMPERSONATION` 控制，預設 false，正式環境請勿開啟。**
+
+這三項讓「新增的 API 都在 03-API契約.md 有對應」這條 DoD 不再成立。
+若要回到純規格狀態，照上面的移除方式處理即可。
+
+### 建議（不實作）
+
+1. O4 的結案確認框目前只顯示固定文字。要顯示「將轉為未取的筆數」需要 §9 的
+   `GET /operator/market-days/:id/sub-orders?status=PENDING`，該端點在 Sprint 4，屆時再接上。
+2. `invite_code` 的流水號目前每次都掃該場次全部未回收的碼。單場攤商數量在數十以內沒有問題，
+   若未來一場上百攤，改成在 `market_day` 上放一個 counter 欄位會更省。

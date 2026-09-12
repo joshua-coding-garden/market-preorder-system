@@ -6,6 +6,7 @@ const NAV = [
   { to: '/operator/stalls', label: '攤商' },
   { to: '/operator/markets', label: '市集' },
   { to: '/operator/broadcasts', label: '推播' },
+  { to: '/operator/permissions', label: '帳號與權限' },
 ]
 
 /** 廠商 CMS 外框（05 §廠商 View） */

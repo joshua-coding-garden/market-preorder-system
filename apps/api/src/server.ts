@@ -1,12 +1,17 @@
 import { buildApp } from './app.js'
 import { config } from './config.js'
+import { startJobs } from './jobs/index.js'
 import { prisma } from './lib/db.js'
 
 async function main(): Promise<void> {
   const app = await buildApp()
 
+  // 排程（04 §G）只在真正啟動服務時開；測試直接呼叫 job 函式
+  const tasks = startJobs(app.log)
+
   const shutdown = async (signal: string): Promise<void> => {
     app.log.info({ signal }, 'shutting down')
+    for (const task of tasks) task.stop()
     await app.close()
     await prisma.$disconnect()
     process.exit(0)

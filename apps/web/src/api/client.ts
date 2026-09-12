@@ -66,7 +66,11 @@ export const api = {
   delete: <T>(path: string) => apiFetch<T>(path, { method: 'DELETE' }),
 }
 
-/** 導向 LINE 登入（C9） */
-export function goToLineLogin(redirect: string = window.location.pathname): void {
-  window.location.href = `${BASE}/api/auth/line/start?redirect=${encodeURIComponent(redirect)}`
+/** 導向第三方登入（C9）。google 是規格外的暫時通道，見 NOTES.md */
+export function goToLogin(
+  provider: 'line' | 'google' = 'line',
+  redirect: string = window.location.pathname,
+): void {
+  const target = `${BASE}/api/auth/${provider}/start?redirect=${encodeURIComponent(redirect)}`
+  window.location.href = target
 }

@@ -1,7 +1,17 @@
-// 前後端共用的 request schema（B-8）。依 Sprint 逐步補齊，目前涵蓋 Sprint 0。
+// 前後端共用的 request schema（B-8）。依 Sprint 逐步補齊。
 import { z } from 'zod'
-import { MarketDayStatus } from './enums.js'
-import { isoDateSchema, marketCodeSchema, uuidSchema } from './primitives.js'
+import { ListingStatus, MarketDayStatus, SubOrderStatus } from './enums.js'
+import {
+  hhmmSchema,
+  inviteCodeSchema,
+  isoDateSchema,
+  isoDateTimeSchema,
+  marketCodeSchema,
+  moneySchema,
+  phoneSchema,
+  productCodeSchema,
+  uuidSchema,
+} from './primitives.js'
 
 // ---------- §1 Auth ----------
 
@@ -49,5 +59,244 @@ export const createMarketSchema = z.object({
 })
 export type CreateMarketInput = z.infer<typeof createMarketSchema>
 
+/** POST /operator/market-days */
+export const createMarketDaySchema = z
+  .object({
+    marketId: uuidSchema,
+    eventDate: isoDateSchema,
+    openTime: hhmmSchema,
+    closeTime: hhmmSchema,
+    /** ISO 8601（UTC）；前端由台北當地時間換算 */
+    orderDeadline: isoDateTimeSchema,
+    locationNote: z.string().trim().max(200).optional(),
+  })
+  .refine((v) => v.closeTime > v.openTime, {
+    message: '結束時間必須晚於開始時間',
+    path: ['closeTime'],
+  })
+export type CreateMarketDayInput = z.infer<typeof createMarketDaySchema>
+
+/** PATCH /operator/market-days/:id（可部分更新） */
+export const updateMarketDaySchema = z
+  .object({
+    eventDate: isoDateSchema.optional(),
+    openTime: hhmmSchema.optional(),
+    closeTime: hhmmSchema.optional(),
+    orderDeadline: isoDateTimeSchema.optional(),
+    locationNote: z.string().trim().max(200).nullable().optional(),
+  })
+  .refine(
+    (v) => !(v.openTime && v.closeTime) || v.closeTime > v.openTime,
+    { message: '結束時間必須晚於開始時間', path: ['closeTime'] },
+  )
+export type UpdateMarketDayInput = z.infer<typeof updateMarketDaySchema>
+
+// ---------- §3 攤商與參與 ----------
+
+/** POST /operator/stalls */
+export const createStallSchema = z.object({
+  name: z.string().trim().min(1).max(50),
+  description: z.string().trim().max(500).optional(),
+  contactName: z.string().trim().max(50).optional(),
+  contactPhone: phoneSchema.optional(),
+})
+export type CreateStallInput = z.infer<typeof createStallSchema>
+
+/** PATCH /operator/stalls/:id */
+export const updateStallSchema = createStallSchema.partial().extend({
+  isActive: z.boolean().optional(),
+})
+export type UpdateStallInput = z.infer<typeof updateStallSchema>
+
+/** POST /operator/market-days/:id/participations */
+export const createParticipationSchema = z.object({
+  stallId: uuidSchema,
+  boothNo: z.string().trim().min(1).max(20),
+})
+export type CreateParticipationInput = z.infer<typeof createParticipationSchema>
+
+/** PATCH /operator/participations/:id */
+export const updateParticipationSchema = z.object({
+  boothNo: z.string().trim().min(1).max(20),
+})
+export type UpdateParticipationInput = z.infer<typeof updateParticipationSchema>
+
+/** POST /stall/invite-codes/redeem；大小寫與空白在伺服器端正規化 */
+export const redeemInviteSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .transform((v) => v.toUpperCase().replace(/\s+/g, ''))
+    .pipe(inviteCodeSchema),
+})
+export type RedeemInviteInput = z.infer<typeof redeemInviteSchema>
+
+// ---------- §4 商品與內容物 ----------
+
+export const productComponentInputSchema = z.object({
+  id: uuidSchema.optional(),
+  name: z.string().trim().min(1).max(50),
+  extraPrice: moneySchema,
+  allowCustomNote: z.boolean().default(true),
+  sortOrder: z.number().int().min(0).default(0),
+})
+export type ProductComponentInput = z.infer<typeof productComponentInputSchema>
+
+export const createProductSchema = z.object({
+  code: productCodeSchema,
+  name: z.string().trim().min(1).max(50),
+  description: z.string().trim().max(500).optional(),
+  basePrice: moneySchema,
+  sortOrder: z.number().int().min(0).optional(),
+  components: z.array(productComponentInputSchema).max(30).optional(),
+})
+export type CreateProductInput = z.infer<typeof createProductSchema>
+
+/** PATCH /stalls/:stallId/products/:id（不含 components） */
+export const updateProductSchema = createProductSchema
+  .omit({ components: true })
+  .partial()
+  .extend({ isActive: z.boolean().optional() })
+export type UpdateProductInput = z.infer<typeof updateProductSchema>
+
+/** PUT /stalls/:stallId/products/:id/components：整組取代 */
+export const replaceComponentsSchema = z.array(productComponentInputSchema).max(30)
+export type ReplaceComponentsInput = z.infer<typeof replaceComponentsSchema>
+
+export const productListQuerySchema = z.object({
+  includeInactive: z
+    .union([z.boolean(), z.enum(['true', 'false'])])
+    .transform((v) => v === true || v === 'true')
+    .optional(),
+})
+
+// ---------- §5 本場上架 ----------
+
+export const listingInputSchema = z.object({
+  productId: uuidSchema,
+  price: moneySchema,
+  maxQty: z.number().int().min(1).nullable().optional(),
+  status: z.enum(ListingStatus).default('ON_SALE'),
+})
+export type ListingInput = z.infer<typeof listingInputSchema>
+
+/** PUT /stalls/:stallId/market-days/:dayId/listings：整組 upsert */
+export const replaceListingsSchema = z.array(listingInputSchema).max(500)
+export type ReplaceListingsInput = z.infer<typeof replaceListingsSchema>
+
+export const copyListingsSchema = z.object({ sourceDayId: uuidSchema })
+export type CopyListingsInput = z.infer<typeof copyListingsSchema>
+
+export const listingQuerySchema = z.object({
+  stallId: uuidSchema.optional(),
+  q: z.string().trim().max(50).optional(),
+})
+
+// ---------- §6 購物車 ----------
+
+export const cartItemComponentSchema = z.object({
+  componentId: uuidSchema,
+  customNote: z.string().trim().max(100).optional(),
+})
+
+export const addCartItemSchema = z.object({
+  marketDayId: uuidSchema,
+  listingId: uuidSchema,
+  qty: z.number().int().min(1).max(99),
+  components: z.array(cartItemComponentSchema).max(30).default([]),
+})
+export type AddCartItemInput = z.infer<typeof addCartItemSchema>
+
+/** PATCH /cart/items/:id：只能改數量；0 等同刪除 */
+export const updateCartItemSchema = z.object({
+  qty: z.number().int().min(0).max(99),
+})
+export type UpdateCartItemInput = z.infer<typeof updateCartItemSchema>
+
+export const cartQuerySchema = z.object({ marketDayId: uuidSchema })
+
+// ---------- §7 下單 ----------
+
+export const createOrderSchema = z.object({
+  marketDayId: uuidSchema,
+  contactName: z.string().trim().min(1).max(50),
+  contactPhone: phoneSchema,
+  /** "HH:mm"，15 分鐘倍數，需落在 [openTime, closeTime]（由伺服器再驗一次） */
+  pickupAt: hhmmSchema.refine((v) => Number(v.slice(3, 5)) % 15 === 0, {
+    message: '取貨時間需為 15 分鐘的倍數',
+  }),
+  note: z.string().trim().max(200).optional(),
+  idempotencyKey: uuidSchema,
+})
+export type CreateOrderInput = z.infer<typeof createOrderSchema>
+
+// ---------- §8 攤商訂單 ----------
+
+export const subOrderListQuerySchema = z.object({
+  status: z.enum(SubOrderStatus).optional(),
+})
+
+export const pickupLookupSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .transform((v) => v.toUpperCase()),
+})
+export type PickupLookupInput = z.infer<typeof pickupLookupSchema>
+
+/** PATCH /stalls/:stallId/sub-orders/:id/status：只允許這兩種 */
+export const updateSubOrderStatusSchema = z.object({
+  status: z.enum(['NO_SHOW', 'CANCELLED']),
+})
+export type UpdateSubOrderStatusInput = z.infer<typeof updateSubOrderStatusSchema>
+
+// ---------- §10 推播 ----------
+
+export const createBroadcastSchema = z.object({
+  composeMode: z.enum(['OPERATOR_COMPOSE', 'STALL_COMPOSE']),
+  marketDayId: uuidSchema.optional(),
+  title: z.string().trim().max(40).optional(),
+  bodyText: z.string().trim().max(500).optional(),
+  imageUrl: z.string().trim().max(500).optional(),
+  audience: z
+    .enum(['ALL_FRIENDS', 'MARKET_DAY_CUSTOMERS', 'STALL_CUSTOMERS'])
+    .optional(),
+})
+export type CreateBroadcastInput = z.infer<typeof createBroadcastSchema>
+
+export const updateBroadcastSchema = z.object({
+  marketDayId: uuidSchema.nullable().optional(),
+  title: z.string().trim().max(40).optional(),
+  bodyText: z.string().trim().max(500).optional(),
+  imageUrl: z.string().trim().max(500).nullable().optional(),
+  audience: z
+    .enum(['ALL_FRIENDS', 'MARKET_DAY_CUSTOMERS', 'STALL_CUSTOMERS'])
+    .optional(),
+})
+export type UpdateBroadcastInput = z.infer<typeof updateBroadcastSchema>
+
+export const rejectBroadcastSchema = z.object({
+  reason: z.string().trim().min(1, '請填寫退回原因').max(200),
+})
+export type RejectBroadcastInput = z.infer<typeof rejectBroadcastSchema>
+
+export const broadcastListQuerySchema = z.object({
+  status: z
+    .enum(['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'REJECTED', 'SENT', 'FAILED'])
+    .optional(),
+})
+
+// ---------- 共用 param ----------
+
 export const idParamSchema = z.object({ id: uuidSchema })
 export type IdParam = z.infer<typeof idParamSchema>
+
+export const stallIdParamSchema = z.object({ stallId: uuidSchema })
+export const stallDayParamSchema = z.object({
+  stallId: uuidSchema,
+  dayId: uuidSchema,
+})
+export const stallResourceParamSchema = z.object({
+  stallId: uuidSchema,
+  id: uuidSchema,
+})

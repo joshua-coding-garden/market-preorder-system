@@ -48,6 +48,16 @@ const envSchema = z.object({
     .string()
     .default('http://localhost:3000/api/auth/line/callback'),
 
+  // ⚠️ 規格外的暫時登入通道（委託方指示）：Google 第三方登入
+  GOOGLE_CLIENT_ID: z.string().default(''),
+  GOOGLE_CLIENT_SECRET: z.string().default(''),
+  GOOGLE_CALLBACK_URL: z
+    .string()
+    .default('http://localhost:3000/api/auth/google/callback'),
+
+  // ⚠️ 規格外：廠商後台的身分模擬功能。正式環境請保持 false
+  ENABLE_IMPERSONATION: booleanish.default('false'),
+
   // LINE Messaging API（Sprint 5 起）
   LINE_MESSAGING_CHANNEL_SECRET: z.string().default(''),
   LINE_MESSAGING_CHANNEL_ACCESS_TOKEN: z.string().default(''),
