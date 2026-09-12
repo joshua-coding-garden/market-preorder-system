@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "concurrently -n api,web -c cyan,magenta \"pnpm --filter @market/api dev\" \"pnpm --filter @market/web dev\"",
+    "tunnel": "node scripts/tunnel.mjs",
     "build": "pnpm --filter @market/api build && pnpm --filter @market/web build",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint .",

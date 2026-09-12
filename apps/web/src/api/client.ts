@@ -16,15 +16,32 @@ export class ApiError extends Error {
   }
 }
 
+const NGROK_HOST = /\.ngrok(-free)?\.(app|dev|io)$/
+
+/**
+ * ngrok 免費方案會對「看起來像瀏覽器」的請求插入一頁警告，
+ * 連 fetch 也會拿到 HTML 而不是 JSON。這個 header 是官方的 bypass 方式。
+ * 只在 ngrok 網域下加，正式部署不受影響。
+ * （網址列直接輸入或第三方轉址仍會看到警告頁，按一次「Visit Site」即可。）
+ */
+function tunnelHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return {}
+  return NGROK_HOST.test(window.location.hostname)
+    ? { 'ngrok-skip-browser-warning': 'true' }
+    : {}
+}
+
 /** 呼叫後端 API；session 走 httpOnly cookie，因此一律帶 credentials */
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const isJsonBody = init.body && !(init.body instanceof FormData)
   const res = await fetch(`${BASE}/api${path}`, {
     credentials: 'include',
-    headers:
-      init.body && !(init.body instanceof FormData)
-        ? { 'content-type': 'application/json', ...init.headers }
-        : init.headers,
     ...init,
+    headers: {
+      ...(isJsonBody ? { 'content-type': 'application/json' } : {}),
+      ...tunnelHeaders(),
+      ...init.headers,
+    },
   })
 
   if (res.status === 204) return undefined as T

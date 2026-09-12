@@ -55,11 +55,68 @@ pnpm dev
 > `pnpm dev` 的前端會把 `/api/*` proxy 到 `localhost:3000`，因此瀏覽器端是同源，
 > session cookie 不需要跨站設定。
 
-### 手機實機測試
+### 手機實機測試（區網）
 
-Vite 已開 `host: true`，同一個 Wi-Fi 下用電腦的區網 IP 開 `http://<你的IP>:5173` 即可。
-LINE 登入需要 callback 走得通，請把 `WEB_URL` 與 `LINE_LOGIN_CALLBACK_URL` 換成該網址
-（或使用 ngrok 之類的通道），並同步更新 LINE Console 的 Callback URL。
+Vite 已開 `host: true`，同一個 Wi-Fi 下用電腦的區網 IP 開 `http://<你的IP>:5173` 即可瀏覽。
+但 LINE 登入需要 HTTPS 的公開 callback，區網 IP 不行，要用下面的 ngrok。
+
+---
+
+## 用 ngrok 開公開網址（LINE 登入必備）
+
+LINE Login 的 Callback URL 必須是外部連得到的 HTTPS 網址，本機 `localhost` 不行。
+開發階段用 ngrok 開一條通道即可。
+
+```bash
+# 前置：安裝 ngrok 並設定 authtoken（只要做一次）
+#   https://dashboard.ngrok.com/get-started/your-authtoken
+ngrok config add-authtoken <你的 token>
+```
+
+啟動順序（三個終端機，或讓前兩個在背景跑）：
+
+```bash
+pnpm db:up      # 1. 資料庫
+pnpm tunnel     # 2. 開通道；會印出公開網址，並自動寫回 .env
+pnpm dev        # 3. 啟動 API 與前端（一定要在 tunnel 之後，才會讀到新的 .env）
+```
+
+`pnpm tunnel` 做的事：
+
+- `ngrok http 5173` 開一條通道到**前端**。
+  為什麼是前端：`pnpm dev` 的 Vite 會把 `/api/*` proxy 到 `:3000`，
+  所以一條通道就能同時服務網頁與 API，兩者同源，
+  session cookie（`SameSite=Lax`）不需要任何跨站設定。
+- 自動把網址寫回 `.env` 的 `WEB_URL`、`LINE_LOGIN_CALLBACK_URL`，
+  並把 `COOKIE_SECURE` 設成 `true`（通道是 HTTPS）。
+
+然後到 **LINE Console → LINE Login → Callback URL** 貼上腳本印出的那行
+（`https://xxxx.ngrok-free.app/api/auth/line/callback`），手機開公開網址就能登入。
+
+### ngrok 免費方案的兩個坑
+
+1. **每次重開 `pnpm tunnel`，網址都會變。**
+   `.env` 會自動更新，但你必須：重跑 `pnpm dev`、並回 LINE Console 換掉 Callback URL。
+   受不了的話就升級 ngrok 付費版用固定網域，或直接部署到正式環境。
+2. **第一次進站會有一頁 ngrok 警告**（`ERR_NGROK_6024`），按「Visit Site」即可，
+   之後 ngrok 會種 cookie 不再顯示。
+   這頁警告連 `fetch('/api/...')` 也會攔（回 HTML 而不是 JSON），
+   因此 `apps/web/src/api/client.ts` 在 ngrok 網域下會自動帶
+   `ngrok-skip-browser-warning` header —— 這是 ngrok 官方的 bypass 方式，
+   只在 ngrok 網域生效，正式部署完全不受影響。
+
+### 改回純本機（不用 ngrok）
+
+把 `.env` 改回：
+
+```
+WEB_URL=http://localhost:5173
+LINE_LOGIN_CALLBACK_URL=http://localhost:3000/api/auth/line/callback
+COOKIE_SECURE=false
+```
+
+`COOKIE_SECURE=false` 是關鍵 —— 設成 `true` 時 cookie 只會在 HTTPS 下送出，
+用 `http://localhost` 會一直登不進去。
 
 ---
 
@@ -68,6 +125,7 @@ LINE 登入需要 callback 走得通，請把 `WEB_URL` 與 `LINE_LOGIN_CALLBACK
 | 指令 | 說明 |
 |---|---|
 | `pnpm dev` | 同時啟動 API 與前端 |
+| `pnpm tunnel` | 開 ngrok 通道到公開網址，並把網址寫回 `.env`（LINE 登入用） |
 | `pnpm build` | 產出 `apps/api/dist` 與 `apps/web/dist` |
 | `pnpm typecheck` | 全 workspace 型別檢查 |
 | `pnpm lint` | ESLint |
@@ -111,8 +169,10 @@ pnpm test
 2. 在該 Provider 下建立 **LINE Login channel**：
    - `Channel ID` → `.env` 的 `LINE_LOGIN_CHANNEL_ID`
    - `Channel secret` → `.env` 的 `LINE_LOGIN_CHANNEL_SECRET`
-   - **LINE Login 分頁 → Callback URL** 填入與 `.env` 的 `LINE_LOGIN_CALLBACK_URL` **完全一致**的網址，
-     本機預設為 `http://localhost:3000/api/auth/line/callback`
+   - **LINE Login 分頁 → Callback URL** 填入與 `.env` 的 `LINE_LOGIN_CALLBACK_URL` **完全一致**的網址。
+     用 ngrok 時就是 `pnpm tunnel` 印出的那行
+     （`https://xxxx.ngrok-free.app/api/auth/line/callback`）；
+     **`localhost` 不會被 LINE 接受**
    - `OpenID Connect` 需啟用（本系統用 ID token 在伺服器端驗證身分）
 3. 在**同一個 Provider** 下建立 **Messaging API channel**（Sprint 5 才會用到）：
    - `Channel secret` → `LINE_MESSAGING_CHANNEL_SECRET`
