@@ -5,6 +5,9 @@ import { SessionProvider } from '@/store/session'
 import CustomerLayout from '@/routes/customer/Layout'
 import Login from '@/routes/customer/Login'
 import MarketDayList from '@/routes/customer/MarketDayList'
+import MarketDayPage from '@/routes/customer/MarketDayPage'
+import ProductDetail from '@/routes/customer/ProductDetail'
+import StallPage from '@/routes/customer/StallPage'
 import OperatorLayout from '@/routes/operator/Layout'
 import MarketDayDetail from '@/routes/operator/MarketDayDetail'
 import MarketDays from '@/routes/operator/MarketDays'
@@ -14,6 +17,9 @@ import OperatorStalls from '@/routes/operator/Stalls'
 import Placeholder from '@/routes/Placeholder'
 import StallLayout from '@/routes/stall/Layout'
 import StallHome from '@/routes/stall/StallHome'
+import StallListings from '@/routes/stall/Listings'
+import StallProductEdit from '@/routes/stall/ProductEdit'
+import StallProducts from '@/routes/stall/Products'
 import Redeem from '@/routes/stall/Redeem'
 import { RequireCapability } from '@/routes/guard'
 
@@ -34,11 +40,9 @@ export default function App() {
           <Route element={<CustomerLayout />}>
             <Route index element={<MarketDayList />} />
             <Route path="login" element={<Login />} />
-            <Route path="days/:dayId" element={<Placeholder screen="場次頁" sprint={2} />} />
-            <Route
-              path="days/:dayId/stalls/:stallId"
-              element={<Placeholder screen="攤商頁" sprint={2} />}
-            />
+            <Route path="days/:dayId" element={<MarketDayPage />} />
+            <Route path="days/:dayId/products/:listingId" element={<ProductDetail />} />
+            <Route path="days/:dayId/stalls/:stallId" element={<StallPage />} />
             <Route path="days/:dayId/cart" element={<Placeholder screen="購物車" sprint={3} />} />
             <Route
               path="days/:dayId/checkout"
@@ -58,18 +62,9 @@ export default function App() {
             }
           >
             <Route index element={<StallHome />} />
-            <Route
-              path=":stallId/products"
-              element={<Placeholder screen="商品管理" sprint={2} />}
-            />
-            <Route
-              path=":stallId/products/:id"
-              element={<Placeholder screen="商品編輯" sprint={2} />}
-            />
-            <Route
-              path=":stallId/days/:dayId/listings"
-              element={<Placeholder screen="本場上架" sprint={2} />}
-            />
+            <Route path=":stallId/products" element={<StallProducts />} />
+            <Route path=":stallId/products/:id" element={<StallProductEdit />} />
+            <Route path=":stallId/days/:dayId/listings" element={<StallListings />} />
             <Route
               path=":stallId/days/:dayId/orders"
               element={<Placeholder screen="訂單列表" sprint={4} />}

@@ -1,10 +1,15 @@
+import { resolve } from 'node:path'
+import fastifyMultipart from '@fastify/multipart'
+import fastifyStatic from '@fastify/static'
 import Fastify, { type FastifyInstance } from 'fastify'
 import { config } from './config.js'
+import { MAX_IMAGE_BYTES } from './lib/image.js'
 import authPlugin from './plugins/auth.js'
 import errorPlugin from './plugins/error.js'
 import adminRoutes from './modules/admin/routes.js'
 import authRoutes from './modules/auth/routes.js'
 import marketRoutes from './modules/market/routes.js'
+import productRoutes from './modules/product/routes.js'
 import stallRoutes from './modules/stall/routes.js'
 
 /**
@@ -33,10 +38,25 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(errorPlugin)
   await app.register(authPlugin)
 
+  // 圖片上傳（04 §F）：單檔、上限 8MB，超過在 route 內轉成 IMAGE_TOO_LARGE
+  await app.register(fastifyMultipart, {
+    limits: { files: 1, fileSize: MAX_IMAGE_BYTES + 1 },
+  })
+
+  // STORAGE_DRIVER=local 時由 Fastify 提供 /uploads/*（D-12）
+  if (config.STORAGE_DRIVER === 'local') {
+    await app.register(fastifyStatic, {
+      root: resolve(process.cwd(), config.UPLOAD_DIR),
+      prefix: '/uploads/',
+      decorateReply: false,
+    })
+  }
+
   app.get('/api/health', async () => ({ ok: true, now: new Date().toISOString() }))
 
   await app.register(authRoutes, { prefix: '/api' })
   await app.register(marketRoutes, { prefix: '/api' })
+  await app.register(productRoutes, { prefix: '/api' })
   await app.register(stallRoutes, { prefix: '/api' })
   await app.register(adminRoutes, { prefix: '/api' })
 

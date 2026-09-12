@@ -211,3 +211,48 @@ LINE Login 的 Callback URL 必須是外部連得到的 HTTPS 網址，`localhos
    `GET /operator/market-days/:id/sub-orders?status=PENDING`，該端點在 Sprint 4，屆時再接上。
 2. `invite_code` 的流水號目前每次都掃該場次全部未回收的碼。單場攤商數量在數十以內沒有問題，
    若未來一場上百攤，改成在 `market_day` 上放一個 counter 欄位會更省。
+
+---
+
+## Sprint 2｜商品、內容物、圖片、本場上架
+
+日期：2026-09-12
+
+### 完成項目
+
+- **API §4**：`GET/POST /stalls/:stallId/products`、`PATCH`／`DELETE`（軟刪）、
+  `PUT .../components`（整組取代，未列出的舊 id 轉 `is_active=false` 而非刪除，
+  因為 `order_item_component.component_id` 要能追溯）、`POST .../image`。
+- **API §5**：`GET/PUT /stalls/:stallId/market-days/:dayId/listings`、`copy-from`；
+  以及顧客端的 `GET /market-days/:id/listings`（schema.sql Q1）。
+- **圖片管線（04 §F、B-12）**：`lib/image.ts` 用 sharp `rotate()`（依 EXIF）→ resize inside →
+  WebP。主圖最長邊 1200 q80、縮圖 400 q75；原始檔不落地，舊圖在新圖寫入成功後才刪。
+  `STORAGE_DRIVER=local` 由 `@fastify/static` 提供 `/uploads/*`。
+- **畫面**：S3 商品管理、S4 商品編輯（ImageUploader + 內容物可增刪排序）、S5 本場上架
+  （勾選、售價、上限、狀態、沿用上一場）、C2 場次頁（攤商 chips、搜尋、商品格狀列表）、
+  C3 攤商頁、C4 商品詳情（本 Sprint 為唯讀，Sprint 3 再加購物車）。
+
+### 驗收結果（07 §S2）
+
+| # | 項目 | 結果 |
+|---|---|---|
+| S2-1 | 新增商品含兩個內容物 | ✅ `[auto]` 建立時可一併帶 components；S3 顯示內容物數 |
+| S2-2 | 同攤重複代碼 → 409 `PRODUCT_CODE_DUPLICATE` | ✅ `[auto]` 另驗不同攤可用相同代碼 |
+| S2-3 | 4000×3000 JPG → 主圖 1200 WebP、縮圖 400 WebP | ✅ `[auto]` 把檔案抓回來用 sharp 驗實際尺寸（1200×900）與格式；另驗小圖不放大 |
+| S2-4 | 9MB 檔 → 400 `IMAGE_TOO_LARGE` | ✅ `[auto]` |
+| S2-5 | `.gif` → 400 `IMAGE_TYPE_UNSUPPORTED` | ✅ `[auto]` 另驗別攤上傳回 403 |
+| S2-6 | 上架後顧客端看得到、價格正確 | ✅ `[auto]` 顧客端回傳 price 為本場售價、含攤商名與攤位號 |
+| S2-7 | `copy-from` → `{ copied: 2, skipped: 1 }` | ✅ `[auto]` 另驗已存在者不被來源價格覆蓋 |
+| S2-8 | 攤商 A 讀 B 的商品 → 403 | ✅ `[auto]` body 不含 B 的商品名；另驗 A 不能建商品到 B、operator 可代操作 |
+| S2-9 | CLOSED 場次 `PUT listings` → 409 | ✅ `[auto]` 另驗 `copy-from` 到已結案場次也 409 |
+| S2-10 | `OFF_SHELF` 顧客看不到、`SOLD_OUT` 看得到並標售完 | ✅ `[auto]` 另驗停用商品與 DRAFT 場次都看不到 |
+
+`pnpm typecheck` ✅　`pnpm lint` ✅　`pnpm test` ✅ 55/55
+（auth 9 + invite 23 + product 8 + image 6 + listing 9）
+
+### 已知問題
+
+1. **`STORAGE_DRIVER=s3` 尚未實作**（D-12）。目前設成 `s3` 會直接丟出明確錯誤，
+   而不是靜默寫到本機。正式部署前需要補上 S3 client，或確認部署平台有持久化磁碟。
+2. **`PUT listings` 會把沒列出的商品轉成 `OFF_SHELF`**。這是「整組 upsert」的合理解讀，
+   S5 畫面每次都送出完整清單所以沒問題；若之後有其他呼叫端要注意。

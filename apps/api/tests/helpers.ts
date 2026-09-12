@@ -92,3 +92,71 @@ export async function createMarketDay(opts: {
 export async function createStall(name = '測試攤商') {
   return prisma.stall.create({ data: { name } })
 }
+
+/** 直接建立 stall_member（跳過邀請碼流程，測試用） */
+export async function joinStall(userId: string, stallId: string) {
+  return prisma.stallMember.upsert({
+    where: { userId_stallId: { userId, stallId } },
+    create: { userId, stallId },
+    update: {},
+  })
+}
+
+/** 建立 participation（攤商參加某場次） */
+export async function createParticipation(
+  marketDayId: string,
+  stallId: string,
+  boothNo = 'B01',
+) {
+  return prisma.participation.create({ data: { marketDayId, stallId, boothNo } })
+}
+
+/** 建立商品（可含內容物） */
+export async function createProduct(opts: {
+  stallId: string
+  code: string
+  name: string
+  basePrice: number
+  components?: { name: string; extraPrice: number; allowCustomNote?: boolean }[]
+}) {
+  return prisma.product.create({
+    data: {
+      stallId: opts.stallId,
+      code: opts.code,
+      name: opts.name,
+      basePrice: opts.basePrice,
+      components: opts.components?.length
+        ? {
+            create: opts.components.map((c, i) => ({
+              name: c.name,
+              extraPrice: c.extraPrice,
+              allowCustomNote: c.allowCustomNote ?? true,
+              sortOrder: i + 1,
+            })),
+          }
+        : undefined,
+    },
+    include: { components: { orderBy: { sortOrder: 'asc' } } },
+  })
+}
+
+/** 上架商品到某場次 */
+export async function createListing(opts: {
+  marketDayId: string
+  productId: string
+  stallId: string
+  price: number
+  maxQty?: number | null
+  status?: 'ON_SALE' | 'SOLD_OUT' | 'OFF_SHELF'
+}) {
+  return prisma.listing.create({
+    data: {
+      marketDayId: opts.marketDayId,
+      productId: opts.productId,
+      stallId: opts.stallId,
+      price: opts.price,
+      maxQty: opts.maxQty ?? null,
+      status: opts.status ?? 'ON_SALE',
+    },
+  })
+}
