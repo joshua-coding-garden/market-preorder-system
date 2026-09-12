@@ -1,0 +1,471 @@
+// 市集預購系統｜Prisma schema
+// 最終依據是 spec/schema.sql（02-資料模型.md）。欄位用 camelCase，以 @map 對回 snake_case。
+// 金額：整數「元」。時間：timestamptz（UTC）；event_date 為台北當地日期。
+// CHECK 約束與 partial unique index 由 migration 的手寫 SQL 區塊補上（02 §G）。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  user
+  operator
+}
+
+enum MarketDayStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum ListingStatus {
+  ON_SALE
+  SOLD_OUT
+  OFF_SHELF
+}
+
+enum SubOrderStatus {
+  PENDING
+  PICKED_UP
+  NO_SHOW
+  CANCELLED
+}
+
+enum InviteStatus {
+  ACTIVE
+  REDEEMED
+  EXPIRED
+  RECYCLED
+}
+
+enum ComposeMode {
+  OPERATOR_COMPOSE
+  STALL_COMPOSE
+}
+
+enum Audience {
+  ALL_FRIENDS
+  MARKET_DAY_CUSTOMERS
+  STALL_CUSTOMERS
+}
+
+enum BroadcastStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  SENT
+  FAILED
+}
+
+enum NotificationKind {
+  NEW_ORDER
+  PICKUP_REMINDER
+  BROADCAST
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED_QUOTA
+}
+
+/// 所有 LINE 登入者
+model AppUser {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lineUserId  String    @unique @map("line_user_id")
+  displayName String    @default("") @map("display_name")
+  pictureUrl  String?   @map("picture_url")
+  /// 最近一次下單填的電話，僅作預填
+  phone       String?
+  role        UserRole  @default(user)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(6)
+
+  stallMemberships    StallMember[]
+  carts               Cart[]
+  preorders           Preorder[]
+  redeemedInviteCodes InviteCode[]   @relation("InviteRedeemedBy")
+  pickedUpSubOrders   SubOrder[]     @relation("SubOrderPickedUpBy")
+  requestedBroadcasts Broadcast[]    @relation("BroadcastRequestedBy")
+  reviewedBroadcasts  Broadcast[]    @relation("BroadcastReviewedBy")
+  notifications       Notification[]
+
+  @@map("app_user")
+}
+
+/// 市集（固定品牌／地點；邀請碼前綴來源）
+model Market {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String   @unique
+  name        String
+  location    String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  marketDays MarketDay[]
+
+  @@map("market")
+}
+
+/// 場次
+model MarketDay {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  marketId      String          @map("market_id") @db.Uuid
+  eventDate     DateTime        @map("event_date") @db.Date
+  openTime      DateTime        @map("open_time") @db.Time(0)
+  closeTime     DateTime        @map("close_time") @db.Time(0)
+  orderDeadline DateTime        @map("order_deadline") @db.Timestamptz(6)
+  locationNote  String?         @map("location_note")
+  status        MarketDayStatus @default(DRAFT)
+  closedAt      DateTime?       @map("closed_at") @db.Timestamptz(6)
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  market         Market          @relation(fields: [marketId], references: [id], onDelete: Restrict)
+  participations Participation[]
+  listings       Listing[]
+  carts          Cart[]
+  preorders      Preorder[]
+  subOrders      SubOrder[]
+  broadcasts     Broadcast[]
+
+  @@unique([marketId, eventDate])
+  @@index([status, eventDate(sort: Desc)], map: "idx_market_day_status_date")
+  @@map("market_day")
+}
+
+/// 攤商
+model Stall {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  description  String?
+  contactName  String?  @map("contact_name")
+  contactPhone String?  @map("contact_phone")
+  logoUrl      String?  @map("logo_url")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  members        StallMember[]
+  participations Participation[]
+  products       Product[]
+  listings       Listing[]
+  subOrders      SubOrder[]
+  broadcasts     Broadcast[]
+
+  @@map("stall")
+}
+
+/// 誰能操作哪個攤商（透過邀請碼綁定後寫入）
+model StallMember {
+  userId   String   @map("user_id") @db.Uuid
+  stallId  String   @map("stall_id") @db.Uuid
+  joinedAt DateTime @default(now()) @map("joined_at") @db.Timestamptz(6)
+
+  user  AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stall Stall   @relation(fields: [stallId], references: [id], onDelete: Cascade)
+
+  @@id([userId, stallId])
+  @@index([stallId], map: "idx_stall_member_stall")
+  @@map("stall_member")
+}
+
+/// 參與：某攤商參加某場次，含擺攤位置
+model Participation {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  marketDayId String   @map("market_day_id") @db.Uuid
+  stallId     String   @map("stall_id") @db.Uuid
+  boothNo     String   @map("booth_no")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  marketDay   MarketDay    @relation(fields: [marketDayId], references: [id], onDelete: Cascade)
+  stall       Stall        @relation(fields: [stallId], references: [id], onDelete: Restrict)
+  inviteCodes InviteCode[]
+
+  @@unique([marketDayId, stallId])
+  @@unique([marketDayId, boothNo])
+  @@map("participation")
+}
+
+/// 邀請碼：一個參與可發多張（重發），同時只有一張 ACTIVE
+model InviteCode {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  participationId  String       @map("participation_id") @db.Uuid
+  code             String
+  status           InviteStatus @default(ACTIVE)
+  /// 場次當天 23:59:59 台北
+  expiresAt        DateTime     @map("expires_at") @db.Timestamptz(6)
+  /// expires_at + 60 天
+  recyclableAt     DateTime     @map("recyclable_at") @db.Timestamptz(6)
+  redeemedByUserId String?      @map("redeemed_by_user_id") @db.Uuid
+  redeemedAt       DateTime?    @map("redeemed_at") @db.Timestamptz(6)
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  participation Participation @relation(fields: [participationId], references: [id], onDelete: Cascade)
+  redeemedBy    AppUser?      @relation("InviteRedeemedBy", fields: [redeemedByUserId], references: [id])
+
+  @@map("invite_code")
+}
+
+/// 商品本體（跨場次）
+model Product {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  stallId     String   @map("stall_id") @db.Uuid
+  /// 商品代碼（攤商內唯一）
+  code        String
+  name        String
+  /// 攤商輸入的「備註」
+  description String?
+  /// 1200px WebP
+  imageUrl    String?  @map("image_url")
+  /// 400px WebP
+  thumbUrl    String?  @map("thumb_url")
+  basePrice   Int      @map("base_price")
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  stall      Stall              @relation(fields: [stallId], references: [id], onDelete: Cascade)
+  components ProductComponent[]
+  listings   Listing[]
+
+  @@unique([stallId, code])
+  @@index([stallId, isActive], map: "idx_product_stall")
+  @@map("product")
+}
+
+/// 內容物：商品的可複選加購項（一層）
+model ProductComponent {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId       String   @map("product_id") @db.Uuid
+  name            String
+  extraPrice      Int      @default(0) @map("extra_price")
+  allowCustomNote Boolean  @default(true) @map("allow_custom_note")
+  sortOrder       Int      @default(0) @map("sort_order")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  product             Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cartItemComponents  CartItemComponent[]
+  orderItemComponents OrderItemComponent[]
+
+  @@index([productId, isActive], map: "idx_component_product")
+  @@map("product_component")
+}
+
+/// 本場上架：商品在某場次的售價、上限、狀態
+model Listing {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  marketDayId String        @map("market_day_id") @db.Uuid
+  productId   String        @map("product_id") @db.Uuid
+  /// 反正規化，方便攤商隔離查詢
+  stallId     String        @map("stall_id") @db.Uuid
+  price       Int
+  /// 預購上限；NULL 不限
+  maxQty      Int?          @map("max_qty")
+  status      ListingStatus @default(ON_SALE)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  marketDay  MarketDay   @relation(fields: [marketDayId], references: [id], onDelete: Cascade)
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stall      Stall       @relation(fields: [stallId], references: [id], onDelete: Cascade)
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@unique([marketDayId, productId])
+  @@index([marketDayId, stallId, status], map: "idx_listing_day_stall")
+  @@map("listing")
+}
+
+/// 購物車（伺服器端；每人每場次一個）
+model Cart {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  marketDayId String   @map("market_day_id") @db.Uuid
+  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  user      AppUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketDay MarketDay @relation(fields: [marketDayId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+
+  @@unique([userId, marketDayId])
+  @@map("cart")
+}
+
+model CartItem {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cartId    String   @map("cart_id") @db.Uuid
+  listingId String   @map("listing_id") @db.Uuid
+  qty       Int
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  cart       Cart                @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  listing    Listing             @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  components CartItemComponent[]
+
+  @@index([cartId], map: "idx_cart_item_cart")
+  @@map("cart_item")
+}
+
+model CartItemComponent {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cartItemId  String  @map("cart_item_id") @db.Uuid
+  componentId String  @map("component_id") @db.Uuid
+  customNote  String? @map("custom_note")
+
+  cartItem  CartItem         @relation(fields: [cartItemId], references: [id], onDelete: Cascade)
+  component ProductComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+
+  @@unique([cartItemId, componentId])
+  @@map("cart_item_component")
+}
+
+/// 總訂單
+model Preorder {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  marketDayId    String   @map("market_day_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  contactName    String   @map("contact_name")
+  contactPhone   String   @map("contact_phone")
+  /// 顧客選的取貨時間（台北當地）
+  pickupAt       DateTime @map("pickup_at") @db.Time(0)
+  note           String?
+  totalAmount    Int      @map("total_amount")
+  idempotencyKey String   @unique @map("idempotency_key")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  marketDay MarketDay  @relation(fields: [marketDayId], references: [id], onDelete: Restrict)
+  user      AppUser    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  subOrders SubOrder[]
+
+  @@index([userId, createdAt(sort: Desc)], map: "idx_preorder_user")
+  @@index([marketDayId], map: "idx_preorder_day")
+  @@map("preorder")
+}
+
+/// 攤商子單（攤商所有查詢從這張表出發）
+model SubOrder {
+  id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  preorderId  String @map("preorder_id") @db.Uuid
+  /// 反正規化，供取貨碼唯一性
+  marketDayId String @map("market_day_id") @db.Uuid
+  stallId     String @map("stall_id") @db.Uuid
+  /// 快照
+  boothNo     String @map("booth_no")
+  pickupCode  String @map("pickup_code")
+
+  status           SubOrderStatus @default(PENDING)
+  subtotal         Int
+  pickedUpAt       DateTime?      @map("picked_up_at") @db.Timestamptz(6)
+  pickedUpByUserId String?        @map("picked_up_by_user_id") @db.Uuid
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  preorder   Preorder    @relation(fields: [preorderId], references: [id], onDelete: Cascade)
+  marketDay  MarketDay   @relation(fields: [marketDayId], references: [id], onDelete: Restrict)
+  stall      Stall       @relation(fields: [stallId], references: [id], onDelete: Restrict)
+  pickedUpBy AppUser?    @relation("SubOrderPickedUpBy", fields: [pickedUpByUserId], references: [id])
+  items      OrderItem[]
+
+  @@unique([preorderId, stallId])
+  /// 取貨碼：同場次唯一 ＝「每日刷新」
+  @@unique([marketDayId, pickupCode])
+  @@index([stallId, marketDayId, status], map: "idx_sub_order_stall_day")
+  @@map("sub_order")
+}
+
+/// 訂單明細（全部快照）
+model OrderItem {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subOrderId  String  @map("sub_order_id") @db.Uuid
+  /// 僅追溯
+  listingId   String? @map("listing_id") @db.Uuid
+  productCode String  @map("product_code")
+  productName String  @map("product_name")
+  /// 快照：本場售價（不含內容物）
+  unitPrice   Int     @map("unit_price")
+  qty         Int
+  /// (unit_price + Σ extra) × qty
+  lineTotal   Int     @map("line_total")
+
+  subOrder   SubOrder             @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
+  listing    Listing?             @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  components OrderItemComponent[]
+
+  @@index([subOrderId], map: "idx_order_item_sub")
+  @@map("order_item")
+}
+
+model OrderItemComponent {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderItemId String  @map("order_item_id") @db.Uuid
+  /// 僅追溯
+  componentId String? @map("component_id") @db.Uuid
+  name        String
+  extraPrice  Int     @map("extra_price")
+  customNote  String? @map("custom_note")
+
+  orderItem OrderItem         @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  component ProductComponent? @relation(fields: [componentId], references: [id], onDelete: SetNull)
+
+  @@index([orderItemId], map: "idx_oic_item")
+  @@map("order_item_component")
+}
+
+/// 推播（廠商發、或攤商申請經廠商審核）
+model Broadcast {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  marketDayId       String?         @map("market_day_id") @db.Uuid
+  /// 攤商申請時填
+  stallId           String?         @map("stall_id") @db.Uuid
+  requestedByUserId String          @map("requested_by_user_id") @db.Uuid
+  composeMode       ComposeMode     @map("compose_mode")
+  title             String          @default("")
+  bodyText          String          @default("") @map("body_text")
+  imageUrl          String?         @map("image_url")
+  audience          Audience        @default(ALL_FRIENDS)
+  status            BroadcastStatus @default(DRAFT)
+  reviewedByUserId  String?         @map("reviewed_by_user_id") @db.Uuid
+  reviewedAt        DateTime?       @map("reviewed_at") @db.Timestamptz(6)
+  rejectReason      String?         @map("reject_reason")
+  sentAt            DateTime?       @map("sent_at") @db.Timestamptz(6)
+  recipientCount    Int?            @map("recipient_count")
+  error             String?
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  marketDay   MarketDay? @relation(fields: [marketDayId], references: [id], onDelete: SetNull)
+  stall       Stall?     @relation(fields: [stallId], references: [id], onDelete: SetNull)
+  requestedBy AppUser    @relation("BroadcastRequestedBy", fields: [requestedByUserId], references: [id])
+  reviewedBy  AppUser?   @relation("BroadcastReviewedBy", fields: [reviewedByUserId], references: [id])
+
+  @@index([status, createdAt(sort: Desc)], map: "idx_broadcast_status")
+  @@map("broadcast")
+}
+
+/// 系統通知紀錄（所有經 LINE 送出的訊息都留一筆，供稽核與額度估算）
+model Notification {
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kind         NotificationKind
+  /// sub_order.id / preorder.id / broadcast.id
+  refId        String?            @map("ref_id") @db.Uuid
+  /// broadcast 為 NULL
+  userId       String?            @map("user_id") @db.Uuid
+  lineUserId   String?            @map("line_user_id")
+  /// 預估計入額度的則數
+  messageCount Int                @default(1) @map("message_count")
+  status       NotificationStatus @default(QUEUED)
+  error        String?
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  sentAt       DateTime?          @map("sent_at") @db.Timestamptz(6)
+
+  user AppUser? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt, status], map: "idx_notification_month")
+  @@index([kind, refId], map: "idx_notification_ref")
+  @@map("notification")
+}

@@ -1,0 +1,32 @@
+{
+  "name": "market-preorder",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@12.4.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,magenta \"pnpm --filter @market/api dev\" \"pnpm --filter @market/web dev\"",
+    "build": "pnpm --filter @market/api build && pnpm --filter @market/web build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "pnpm --filter @market/api test",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v && docker compose up -d",
+    "db:migrate": "pnpm --filter @market/api db:migrate",
+    "db:migrate:dev": "pnpm --filter @market/api db:migrate:dev",
+    "db:seed": "pnpm --filter @market/api db:seed",
+    "db:studio": "pnpm --filter @market/api db:studio"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "concurrently": "^9.1.0",
+    "eslint": "^9.17.0",
+    "globals": "^15.14.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0"
+  }
+}

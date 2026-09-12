@@ -1,0 +1,12 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# pnpm 預設封鎖相依套件的 build script；這幾個必須執行，
+# 否則 Prisma 拿不到 query engine、esbuild 拿不到原生 binary。
+# （由 `pnpm approve-builds` 產生，已納入版控，clean install 不會再詢問。）
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  esbuild: true
+  prisma: true
