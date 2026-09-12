@@ -84,7 +84,13 @@ describe('S4-4 攤商 A 打攤商 B 的所有端點一律 403', () => {
       ],
       ['post', `/api/stalls/${B}/sub-orders/${bSubOrderId}/pickup`],
       ['patch', `/api/stalls/${B}/sub-orders/${bSubOrderId}/status`, { status: 'NO_SHOW' }],
-      // §10 推播的兩支端點在 Sprint 6 補上（S6-9）
+      // §10 推播（S6-9）
+      ['get', `/api/stalls/${B}/broadcasts`],
+      [
+        'post',
+        `/api/stalls/${B}/broadcasts`,
+        { composeMode: 'STALL_COMPOSE', title: 't', bodyText: 'b' },
+      ],
     ]
 
     for (const [method, path, body] of endpoints) {

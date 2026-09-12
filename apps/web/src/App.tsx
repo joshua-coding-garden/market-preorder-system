@@ -17,13 +17,16 @@ import MarketDayDetail from '@/routes/operator/MarketDayDetail'
 import MarketDays from '@/routes/operator/MarketDays'
 import Markets from '@/routes/operator/Markets'
 import Permissions from '@/routes/operator/Permissions'
+import OperatorBroadcastDetail from '@/routes/operator/BroadcastDetail'
+import OperatorBroadcasts from '@/routes/operator/Broadcasts'
+import OperatorDashboard from '@/routes/operator/Dashboard'
 import OperatorDayOrders from '@/routes/operator/DayOrders'
 import OperatorStalls from '@/routes/operator/Stalls'
-import Placeholder from '@/routes/Placeholder'
 import StallLayout from '@/routes/stall/Layout'
 import StallHome from '@/routes/stall/StallHome'
 import StallListings from '@/routes/stall/Listings'
 import StallProductEdit from '@/routes/stall/ProductEdit'
+import StallBroadcasts from '@/routes/stall/Broadcasts'
 import StallPickup from '@/routes/stall/Pickup'
 import StallPrepSheet from '@/routes/stall/PrepSheet'
 import StallProducts from '@/routes/stall/Products'
@@ -37,7 +40,7 @@ import { RequireCapability } from '@/routes/guard'
  *   /          顧客
  *   /stall     攤商
  *   /operator  廠商
- * 尚未進入實作 Sprint 的畫面用 Placeholder 佔位（06-迭代計畫.md）。
+ * 27 個畫面（05-畫面規格.md）全部實作完成。
  */
 export default function App() {
   return (
@@ -75,10 +78,7 @@ export default function App() {
             <Route path=":stallId/sub-orders/:id" element={<StallSubOrderDetail />} />
             <Route path=":stallId/days/:dayId/prep" element={<StallPrepSheet />} />
             <Route path=":stallId/days/:dayId/pickup" element={<StallPickup />} />
-            <Route
-              path=":stallId/broadcasts"
-              element={<Placeholder screen="推播申請" sprint={6} />}
-            />
+            <Route path=":stallId/broadcasts" element={<StallBroadcasts />} />
           </Route>
 
           {/* 邀請碼綁定：還不是攤商成員的人也要進得來，因此不套 stall 守門 */}
@@ -102,18 +102,15 @@ export default function App() {
               </RequireCapability>
             }
           >
-            <Route index element={<Placeholder screen="儀表板" sprint={1} />} />
+            <Route index element={<OperatorDashboard />} />
             <Route path="markets" element={<Markets />} />
             <Route path="days" element={<MarketDays />} />
             <Route path="days/:id" element={<MarketDayDetail />} />
             <Route path="stalls" element={<OperatorStalls />} />
             <Route path="permissions" element={<Permissions />} />
             <Route path="days/:id/orders" element={<OperatorDayOrders />} />
-            <Route path="broadcasts" element={<Placeholder screen="推播審核" sprint={6} />} />
-            <Route
-              path="broadcasts/:id"
-              element={<Placeholder screen="推播編輯" sprint={6} />}
-            />
+            <Route path="broadcasts" element={<OperatorBroadcasts />} />
+            <Route path="broadcasts/:id" element={<OperatorBroadcastDetail />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

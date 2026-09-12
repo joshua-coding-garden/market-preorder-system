@@ -9,6 +9,7 @@ import errorPlugin from './plugins/error.js'
 import socketPlugin from './plugins/socket.js'
 import adminRoutes from './modules/admin/routes.js'
 import authRoutes from './modules/auth/routes.js'
+import broadcastRoutes from './modules/broadcast/routes.js'
 import lineRoutes from './modules/line/routes.js'
 import marketRoutes from './modules/market/routes.js'
 import orderRoutes from './modules/order/routes.js'
@@ -62,6 +63,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(productRoutes, { prefix: '/api' })
   await app.register(orderRoutes, { prefix: '/api' })
   await app.register(lineRoutes, { prefix: '/api' })
+  await app.register(broadcastRoutes, { prefix: '/api' })
 
   // socket.io 掛在同一個 HTTP server 上（03 §11）
   await app.register(socketPlugin)

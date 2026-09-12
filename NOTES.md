@@ -428,3 +428,61 @@ channel secret 與 access token。填進 `.env` 後：
 1. 到 LINE Console 把 webhook URL 設成 `{WEB_URL}/api/line/webhook` 並啟用
 2. 執行 `pnpm line:richmenu` 建立圖文選單
 3. 用真 LINE 帳號加好友測 S5-2／S5-3，再下一筆單測 S5-9
+
+---
+
+## Sprint 6｜推播申請與審核
+
+日期：2026-09-12
+
+### 完成項目
+
+- **API §10 全部**：攤商申請／列表／圖片上傳；廠商列表、自發、編輯、核准、退回、估算、送出。
+- **狀態機（04 §E 推播段）**：
+  - `STALL_COMPOSE` → `PENDING_REVIEW` →（approve）`APPROVED` →（send）`SENT`／`FAILED`
+  - `OPERATOR_COMPOSE` → `DRAFT` →（廠商填完 approve）`APPROVED`
+  - 廠商自發 → 直接 `APPROVED`
+  - `REJECTED` 必填原因並顯示給攤商；`SENT`／`FAILED` 是終態。
+- **收件人解析（D-09）**：`ALL_FRIENDS` 走 broadcast API（人數用 insight followers，
+  取不到時用 `app_user` 總數當保守值）、`MARKET_DAY_CUSTOMERS` 與 `STALL_CUSTOMERS` 走 multicast。
+- **send 前必估算**：`allowed=false` 時回 409 `QUOTA_EXCEEDED` 且**狀態維持 APPROVED**，
+  讓廠商調整對象或下個月再送。
+- **畫面**：S10 推播申請（兩種模式）、O7 審核列表（狀態 tab）、
+  O8 編輯與送出（LINE 訊息預覽、估算區、核准／退回／送出，`allowed=false` 時送出 disabled）、
+  O1 儀表板（下一場次摘要 + 本月額度進度條 + 待審推播數）。
+
+### 驗收結果（07 §S6）
+
+| # | 項目 | 結果 |
+|---|---|---|
+| S6-1 | `STALL_COMPOSE` 缺 bodyText → 400 | ✅ `[auto]` 另驗缺 title 也 400、且不會留下任何 broadcast |
+| S6-2 | `STALL_COMPOSE` 完整 → 201 `PENDING_REVIEW` | ✅ `[auto]` |
+| S6-3 | `OPERATOR_COMPOSE` → 201 `DRAFT` | ✅ `[auto]` |
+| S6-4 | `reject` 無 reason → 400 | ✅ `[auto]` 狀態維持 PENDING_REVIEW；有 reason 時攤商端看得到原因 |
+| S6-5 | `approve` → APPROVED | ✅ `[auto]` 另驗已 REJECTED 的不能再核准 |
+| S6-6 | DRAFT 直接 `send` → 409 `INVALID_STATE_TRANSITION` | ✅ `[auto]` 且完全沒有呼叫 LINE API |
+| S6-7 | APPROVED 但 `allowed=false` → 409 `QUOTA_EXCEEDED`，狀態仍 APPROVED、無 push | ✅ `[auto]` 三項都驗 |
+| S6-8 | `MARKET_DAY_CUSTOMERS` 3 位顧客 → multicast 1 次 3 人、SENT、`recipient_count=3`、3 筆 notification | ✅ `[auto]` 另驗 `STALL_CUSTOMERS` 只送給向該攤下單的人、`ALL_FRIENDS` 走 broadcast API、送出後為終態 |
+| S6-9 | 攤商 A 讀 B 的推播 → 403 | ✅ `[auto]` 已併回 `authz.test.ts` 的跨攤端點掃描（現為 17 支）；另驗攤商不能自行核准或送出 |
+| S6-10 | O8 預覽、估算人數、額度、退回原因顯示正確 | ✅ 已實作；`[manual]` 待委託方檢視 |
+
+`pnpm typecheck` ✅　`pnpm lint` ✅　`pnpm test` ✅ 159/159（新增 broadcast 17）
+
+**05-畫面規格.md 的 27 個畫面全部實作完成**，`Placeholder` 佔位元件已移除。
+
+### ⚠️ 規格缺口：O1 的額度顯示沒有對應端點
+
+06 迭代計畫要求 Sprint 6 的 O1 顯示「本月訊息額度使用（used / limit）」，
+但 03 §10 只有 `GET /operator/broadcasts/:id/estimate` —— 那支需要一個既有的 broadcast id，
+儀表板上沒有。因此新增了一支 `GET /operator/message-quota`
+（回 `{ monthUsed, monthQuota, pendingReview }`）。
+
+這讓「沒有未列出的端點」這條 DoD 出現第四個例外（前三個是 Google 登入與權限管理，見 Sprint 1）。
+若要嚴格對齊規格，請把這支端點補進 `03-API契約.md` §10。
+
+### 實作決定
+
+1. **額度不足時不改狀態**。規格只說「409 QUOTA_EXCEEDED」，沒說狀態要怎麼變。
+   保持 `APPROVED` 的好處是廠商可以改小對象或等下個月直接重送，不必重建一筆。
+2. **`ALL_FRIENDS` 的估算人數同時決定額度消耗**。broadcast API 只呼叫一次，
+   但 LINE 是以實際送達人數計費，所以估算仍用好友數，不是 1。

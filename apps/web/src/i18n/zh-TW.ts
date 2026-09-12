@@ -34,3 +34,12 @@ export const subOrderStatusLabel: Record<string, string> = {
   NO_SHOW: '未取',
   CANCELLED: '已取消',
 }
+
+export const broadcastStatusLabel: Record<string, string> = {
+  DRAFT: '草稿',
+  PENDING_REVIEW: '待審核',
+  APPROVED: '已核准',
+  REJECTED: '已退回',
+  SENT: '已送出',
+  FAILED: '送出失敗',
+}
