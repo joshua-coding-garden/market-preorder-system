@@ -256,3 +256,64 @@ LINE Login 的 Callback URL 必須是外部連得到的 HTTPS 網址，`localhos
    而不是靜默寫到本機。正式部署前需要補上 S3 client，或確認部署平台有持久化磁碟。
 2. **`PUT listings` 會把沒列出的商品轉成 `OFF_SHELF`**。這是「整組 upsert」的合理解讀，
    S5 畫面每次都送出完整清單所以沒問題；若之後有其他呼叫端要注意。
+
+---
+
+## Sprint 3｜顧客購物車、下單、拆單、取貨碼（核心）
+
+日期：2026-09-12
+
+### 完成項目
+
+- **API §6 購物車**：`GET/DELETE /cart`、`POST /cart/items`、`PATCH/DELETE /cart/items/:id`。
+  同 listing + 相同內容物組合（含備註）累加數量，否則新增一列（D-05）；
+  `qty=0` 等同刪除；內容物 id 一律在後端驗證屬於該商品且仍啟用。
+- **API §7 下單**：`POST /orders` 完全照 03 §7 的九個步驟實作，全部在單一交易內。
+  - `idempotencyKey` 已存在 → 直接回該筆（200），且非本人回 403
+  - `SELECT ... FOR UPDATE` 鎖 listing，**依 id 排序取鎖避免死結**
+  - 上限只計 `PENDING` + `PICKED_UP`（04 §B：NO_SHOW／CANCELLED 釋出額度）
+  - 名稱、代碼、單價、內容物名稱與加價全部快照（B-5）
+  - 三層金額在交易內算好存入，讀取時不重算（02 §D）
+  - commit 後才發 `order:new` 事件（Sprint 4 的 socket 與 Sprint 5 的 LINE 通知都掛在這裡）
+- **取貨碼（D-02）**：`lib/pickupCode.ts` 隨機產碼 → 直接 insert → 撞 unique 就重試（最多 12 次）。
+  比「先查再寫」少一次查詢，也天然免除競態（Sprint 0 NOTES 建議 3 已落實）。
+- **事件匯流排** `lib/events.ts`：service 只發事件不碰 socket，
+  讓交易能先 commit 再通知，測試也不必啟動 socket 伺服器。
+- **畫面**：C4（ComponentPicker、數量 stepper、即時小計、加入購物車）、
+  C5 購物車（分組、stepper、unavailable 灰底且擋結帳）、
+  C6 結帳（TimeSlider 15 分步進、個資告知六項可摺疊、idempotencyKey 進頁即產生並存 sessionStorage）、
+  C7 訂單明細（每攤一張卡、取貨碼大字可複製）、C8 我的訂單、C2 底部購物車浮動按鈕。
+
+### 驗收結果（07 §S3）
+
+| # | 項目 | 結果 |
+|---|---|---|
+| S3-1 | 購物車按攤商分組、顯示內容物與備註、小計 (80+10)×2=180 | ✅ `[auto]` 金額與分組皆驗證 |
+| S3-2 | 同 listing 同內容物再加 → qty 累加不新增列 | ✅ `[auto]` |
+| S3-3 | 同 listing 不同內容物 → 新增一列 | ✅ `[auto]` 另驗「備註不同」「有無內容物」也算不同列 |
+| S3-4 | `qty: 0` → 該列刪除 | ✅ `[auto]` 另驗不能動別人的購物車 |
+| S3-5 | 取貨時間滑桿限制在營業時間、步進 15 分 | ✅ `[auto]` 後端擋超範圍與非 15 分倍數；`[manual]` TimeSlider 已實作 |
+| S3-6 | 電話 `0812345678` → 400 `VALIDATION` | ✅ `[auto]` |
+| S3-7 | 購物車空 → 400 `CART_EMPTY` | ✅ `[auto]` |
+| S3-8 | 已過截止 → 409 `MARKET_DAY_CLOSED` | ✅ `[auto]` 另驗 DRAFT 場次也擋；確認未留下任何 preorder |
+| S3-9 | 三攤五品項含內容物 → 3 張子單、三層金額一致 | ✅ `[auto]` 300 + 530 + 180 = 1010，逐層比對 |
+| S3-10 | 同 `idempotencyKey` 連送兩次 → 同一 id、DB 一筆 | ✅ `[auto]` 201 → 200；另驗別人的 key 回 403 |
+| S3-11 | `max_qty=1` 兩交易同時各買 1 → 恰一個 201 | ✅ `[auto]` 另驗 NO_SHOW 後額度釋出、單筆超量也擋 |
+| S3-12 | 結帳前變 SOLD_OUT → 409 且 `listingIds` 含該項 | ✅ `[auto]` 另驗交易完整回滾 |
+| S3-13 | 事後改價不影響已成立訂單 | ✅ `[auto]` 連商品名稱與代碼一併改過，訂單仍是快照值 |
+| S3-14 | 顧客 Y 讀顧客 X 的訂單 → 403 | ✅ `[auto]` body 不含對方姓名 |
+| S3-15 | C7 每攤一張卡、取貨碼大字 | ✅ `[manual]` 已實作 |
+| S3-16 | 同場次 100 筆訂單取貨碼全唯一且符合字元集 | ✅ `[auto]` 另驗不同場次可重複（每日刷新） |
+| S3-17 | 下單成功後購物車為空 | ✅ `[auto]` |
+
+`pnpm typecheck` ✅　`pnpm lint` ✅　`pnpm test` ✅ 87/87
+（auth 9 + invite 23 + product 8 + image 6 + listing 9 + cart 12 + order 20）
+
+### 實作決定
+
+1. **取鎖順序**：`SELECT ... FOR UPDATE` 前先把 listing id 排序，
+   避免兩張訂單商品重疊但順序相反時互相等待而死結。
+2. **價格以鎖住的 listing 為準**，不是購物車讀到的快取值，
+   避免「加入購物車後攤商改價」造成金額不一致。
+3. **`idempotencyKey` 存在 sessionStorage**，同一分頁重整不會換 key；
+   成功後才清除，因此重整結帳頁重送也是安全的。

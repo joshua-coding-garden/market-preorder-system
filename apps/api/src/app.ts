@@ -9,6 +9,7 @@ import errorPlugin from './plugins/error.js'
 import adminRoutes from './modules/admin/routes.js'
 import authRoutes from './modules/auth/routes.js'
 import marketRoutes from './modules/market/routes.js'
+import orderRoutes from './modules/order/routes.js'
 import productRoutes from './modules/product/routes.js'
 import stallRoutes from './modules/stall/routes.js'
 
@@ -57,6 +58,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(authRoutes, { prefix: '/api' })
   await app.register(marketRoutes, { prefix: '/api' })
   await app.register(productRoutes, { prefix: '/api' })
+  await app.register(orderRoutes, { prefix: '/api' })
   await app.register(stallRoutes, { prefix: '/api' })
   await app.register(adminRoutes, { prefix: '/api' })
 

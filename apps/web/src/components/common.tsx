@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 /** MoneyTWD：NT$ 1,234（05 §共用元件） */
 export function MoneyTWD({ value }: { value: number }) {
@@ -77,5 +77,33 @@ export function PageHeader({ title, subtitle, action }: { title: string; subtitl
       </div>
       {action}
     </header>
+  )
+}
+
+/** PickupCode（05 §共用元件）：4 碼大字等寬顯示，可點複製 */
+export function PickupCode({ code, size = 'lg' }: { code: string; size?: 'lg' | 'md' }) {
+  const [copied, setCopied] = useState(false)
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // 沒有剪貼簿權限時就讓使用者自己選取，不必報錯
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      className={`rounded-xl bg-neutral-900 px-4 font-mono font-bold tracking-[0.3em] text-white ${
+        size === 'lg' ? 'py-3 text-3xl' : 'py-2 text-xl'
+      }`}
+      aria-label={`取貨碼 ${code}，點擊複製`}
+    >
+      {copied ? '已複製' : code}
+    </button>
   )
 }

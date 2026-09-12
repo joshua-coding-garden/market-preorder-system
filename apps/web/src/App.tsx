@@ -5,7 +5,11 @@ import { SessionProvider } from '@/store/session'
 import CustomerLayout from '@/routes/customer/Layout'
 import Login from '@/routes/customer/Login'
 import MarketDayList from '@/routes/customer/MarketDayList'
+import Cart from '@/routes/customer/Cart'
+import Checkout from '@/routes/customer/Checkout'
+import CustomerOrderDetail from '@/routes/customer/OrderDetail'
 import MarketDayPage from '@/routes/customer/MarketDayPage'
+import MyOrders from '@/routes/customer/MyOrders'
 import ProductDetail from '@/routes/customer/ProductDetail'
 import StallPage from '@/routes/customer/StallPage'
 import OperatorLayout from '@/routes/operator/Layout'
@@ -43,13 +47,10 @@ export default function App() {
             <Route path="days/:dayId" element={<MarketDayPage />} />
             <Route path="days/:dayId/products/:listingId" element={<ProductDetail />} />
             <Route path="days/:dayId/stalls/:stallId" element={<StallPage />} />
-            <Route path="days/:dayId/cart" element={<Placeholder screen="購物車" sprint={3} />} />
-            <Route
-              path="days/:dayId/checkout"
-              element={<Placeholder screen="結帳" sprint={3} />}
-            />
-            <Route path="orders" element={<Placeholder screen="我的訂單" sprint={3} />} />
-            <Route path="orders/:id" element={<Placeholder screen="訂單明細" sprint={3} />} />
+            <Route path="days/:dayId/cart" element={<Cart />} />
+            <Route path="days/:dayId/checkout" element={<Checkout />} />
+            <Route path="orders" element={<MyOrders />} />
+            <Route path="orders/:id" element={<CustomerOrderDetail />} />
           </Route>
 
           {/* 攤商 View */}

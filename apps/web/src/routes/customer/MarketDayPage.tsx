@@ -11,6 +11,8 @@ import {
   formatTaipeiDate,
 } from '@/components/common'
 import { inputClass } from '@/components/form'
+import { useSession } from '@/store/session'
+import type { CartData } from '@/api/cartTypes'
 
 export interface PublicListing {
   listingId: string
@@ -30,8 +32,10 @@ export interface PublicListing {
 /** C2 場次頁：場次資訊、攤商 chips、商品格狀列表、搜尋 */
 export default function MarketDayPage() {
   const { dayId = '' } = useParams()
+  const { me } = useSession()
   const day = useApi<MarketDayDetail>(`/market-days/${dayId}`)
   const listings = useApi<{ items: PublicListing[] }>(`/market-days/${dayId}/listings`)
+  const cart = useApi<CartData>(me ? `/cart?marketDayId=${dayId}` : null)
 
   const [stallFilter, setStallFilter] = useState<string | null>(null)
   const [q, setQ] = useState('')
@@ -121,13 +125,30 @@ export default function MarketDayPage() {
       ) : null}
 
       {filtered.length > 0 ? (
-        <ul className="grid grid-cols-2 gap-3 px-4 py-4">
+        <ul className="grid grid-cols-2 gap-3 px-4 py-4 pb-28">
           {filtered.map((l) => (
             <li key={l.listingId}>
               <ProductCard listing={l} dayId={dayId} />
             </li>
           ))}
         </ul>
+      ) : null}
+
+      {cart.data && cart.data.itemCount > 0 ? (
+        <div className="fixed bottom-4 left-1/2 z-20 w-full max-w-screen-sm -translate-x-1/2 px-4">
+          <Link
+            to={`/days/${dayId}/cart`}
+            className="btn-primary flex w-full items-center justify-between shadow-lg"
+          >
+            <span>
+              購物車
+              <span className="ml-2 rounded-full bg-white/25 px-2 py-0.5 text-sm tabular-nums">
+                {cart.data.itemCount}
+              </span>
+            </span>
+            <MoneyTWD value={cart.data.total} />
+          </Link>
+        </div>
       ) : null}
     </>
   )
