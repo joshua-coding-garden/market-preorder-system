@@ -98,7 +98,7 @@ export function PickupCode({ code, size = 'lg' }: { code: string; size?: 'lg' | 
     <button
       type="button"
       onClick={copy}
-      className={`rounded-xl bg-neutral-900 px-4 font-mono font-bold tracking-[0.3em] text-white ${
+      className={`rounded-xl bg-neutral-900 px-4 font-mono font-bold tracking-[0.12em] text-white ${
         size === 'lg' ? 'py-3 text-3xl' : 'py-2 text-xl'
       }`}
       aria-label={`取貨碼 ${code}，點擊複製`}

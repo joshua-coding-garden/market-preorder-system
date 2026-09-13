@@ -4,7 +4,11 @@ import { prisma } from '../../lib/db.js'
 import { AppError, forbidden, notFound } from '../../lib/errors.js'
 import { events } from '../../lib/events.js'
 import { isUniqueViolation } from '../../lib/inviteCode.js'
-import { PICKUP_CODE_MAX_ATTEMPTS, generatePickupCode } from '../../lib/pickupCode.js'
+import {
+  PICKUP_CODE_MAX_ATTEMPTS,
+  buildPickupCode,
+  nextPickupSerial,
+} from '../../lib/pickupCode.js'
 import { dateToIsoDate, timeToHhmm } from '../../lib/time.js'
 import { notifyNewOrder } from '../line/notificationService.js'
 import { isOrderable } from '../market/service.js'
@@ -77,7 +81,10 @@ async function serializeOrder(preorderId: string, client = prisma) {
   }
 }
 
-/** 在交易內產生同場次唯一的取貨碼；撞到就重試（D-02） */
+/**
+ * 在交易內產生取貨碼並建立子單。
+ * 格式為 {攤位}-{流水號}；同時有兩筆訂單進同一攤時會撞號，撞到就 +1 重試。
+ */
 async function createSubOrderWithPickupCode(
   tx: Prisma.TransactionClient,
   data: {
@@ -88,13 +95,18 @@ async function createSubOrderWithPickupCode(
     subtotal: number
   },
 ) {
+  let serial = await nextPickupSerial(tx, data.marketDayId, data.stallId)
+
   for (let attempt = 0; attempt < PICKUP_CODE_MAX_ATTEMPTS; attempt += 1) {
     try {
       return await tx.subOrder.create({
-        data: { ...data, pickupCode: generatePickupCode() },
+        data: { ...data, pickupCode: buildPickupCode(data.boothNo, serial) },
       })
     } catch (err) {
-      if (isUniqueViolation(err, 'pickup_code')) continue
+      if (isUniqueViolation(err, 'pickup_code')) {
+        serial += 1
+        continue
+      }
       throw err
     }
   }

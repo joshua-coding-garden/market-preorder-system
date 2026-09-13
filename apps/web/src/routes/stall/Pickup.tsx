@@ -1,58 +1,50 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { PICKUP_ALPHABET, PICKUP_CODE_LENGTH } from '@market/shared'
 import { api } from '@/api/client'
-import { toMessage } from '@/api/useApi'
+import { toMessage, useApi } from '@/api/useApi'
 import { MoneyTWD, PageHeader, formatTaipeiDateTime } from '@/components/common'
 import { FormError, StatusBadge } from '@/components/form'
 import { subOrderStatusLabel } from '@/i18n/zh-TW'
 import type { StallSubOrder } from './SubOrders'
 
+interface StallDay {
+  boothNo: string
+  marketDay: { id: string }
+}
+
 /**
  * S9 核銷（戶外用）
  * 05 §攤商 View：字級 ≥ 20px、按鈕高度 ≥ 56px、高對比。
- * 4 格輸入自動大寫、自動跳格。
+ *
+ * ⚠️ 取貨碼已改成「攤位-流水號」（委託方 2026-09-13 指示），
+ * 長度不再固定，所以原本的 4 格輸入改成單一大輸入框。
+ * 攤商自己的攤位前綴會先帶好，現場只要打流水號（例：3）就能查。
  */
 export default function Pickup() {
   const { stallId = '', dayId = '' } = useParams()
-  const [chars, setChars] = useState<string[]>(Array(PICKUP_CODE_LENGTH).fill(''))
-  const inputs = useRef<(HTMLInputElement | null)[]>([])
+  const days = useApi<{ items: StallDay[] }>(`/stalls/${stallId}/market-days`)
+  const boothNo =
+    days.data?.items.find((d) => d.marketDay.id === dayId)?.boothNo ?? ''
+
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const [serial, setSerial] = useState('')
   const [found, setFound] = useState<StallSubOrder | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
 
-  const code = chars.join('')
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
+  const code = serial.trim()
 
   const reset = () => {
-    setChars(Array(PICKUP_CODE_LENGTH).fill(''))
+    setSerial('')
     setFound(null)
     setError(null)
     setDone(false)
-    inputs.current[0]?.focus()
-  }
-
-  const setChar = (index: number, raw: string) => {
-    const char = raw.toUpperCase().slice(-1)
-    if (char && !PICKUP_ALPHABET.includes(char)) return
-
-    const next = [...chars]
-    next[index] = char
-    setChars(next)
-    setError(null)
-
-    if (char && index < PICKUP_CODE_LENGTH - 1) {
-      inputs.current[index + 1]?.focus()
-    }
-    if (next.every(Boolean)) {
-      void lookup(next.join(''))
-    }
-  }
-
-  const onKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !chars[index] && index > 0) {
-      inputs.current[index - 1]?.focus()
-    }
+    inputRef.current?.focus()
   }
 
   const lookup = async (value: string) => {
@@ -94,27 +86,40 @@ export default function Pickup() {
       <PageHeader title="核銷取貨" subtitle="請顧客出示取貨碼" />
 
       <div className="px-4">
-        <div className="flex justify-center gap-2">
-          {chars.map((c, i) => (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (code) void lookup(code)
+          }}
+        >
+          <div className="flex items-stretch gap-2">
+            {boothNo ? (
+              <span className="flex items-center rounded-2xl border-2 border-neutral-300 bg-neutral-100 px-3 font-mono text-3xl font-bold text-neutral-600">
+                {boothNo}-
+              </span>
+            ) : null}
             <input
-              key={i}
-              ref={(el) => {
-                inputs.current[i] = el
+              ref={inputRef}
+              value={serial}
+              onChange={(e) => {
+                setSerial(e.target.value.toUpperCase())
+                setError(null)
               }}
-              value={c}
-              onChange={(e) => setChar(i, e.target.value)}
-              onKeyDown={(e) => onKeyDown(i, e)}
               onFocus={(e) => e.target.select()}
-              className="h-20 w-16 rounded-2xl border-2 border-neutral-400 bg-white text-center font-mono text-4xl font-bold uppercase outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
-              maxLength={1}
+              className="h-20 min-w-0 flex-1 rounded-2xl border-2 border-neutral-400 bg-white text-center font-mono text-4xl font-bold uppercase outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+              placeholder="001"
+              maxLength={24}
               autoCapitalize="characters"
               autoCorrect="off"
               spellCheck={false}
-              inputMode="text"
-              aria-label={`取貨碼第 ${i + 1} 碼`}
+              inputMode="numeric"
+              aria-label="取貨碼"
             />
-          ))}
-        </div>
+          </div>
+          <p className="mt-2 text-center text-sm text-neutral-500">
+            輸入流水號即可（例：3）；也可以直接打完整取貨碼
+          </p>
+        </form>
 
         <div className="mt-3 flex justify-center gap-2">
           <button
@@ -129,7 +134,7 @@ export default function Pickup() {
             type="button"
             className="btn-secondary px-4 text-lg"
             style={{ minHeight: 56 }}
-            disabled={code.length !== PICKUP_CODE_LENGTH || busy}
+            disabled={!code || busy}
             onClick={() => lookup(code)}
           >
             查詢

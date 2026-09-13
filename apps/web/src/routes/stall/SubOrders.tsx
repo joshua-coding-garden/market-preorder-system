@@ -148,7 +148,7 @@ export default function SubOrders() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-mono text-2xl font-bold tracking-widest">
+                    <p className="font-mono text-2xl font-bold tracking-wide">
                       {so.pickupCode}
                     </p>
                     <p className="mt-1 text-sm text-neutral-700">

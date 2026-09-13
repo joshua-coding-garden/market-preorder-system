@@ -5,7 +5,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import request from 'supertest'
-import { PICKUP_ALPHABET } from '@market/shared'
 import { prisma } from '../src/lib/db.js'
 import {
   closeTestApp,
@@ -28,7 +27,8 @@ afterAll(async () => {
   await closeTestApp()
 })
 
-const PICKUP_RE = new RegExp(`^[${PICKUP_ALPHABET}]{4}$`)
+/** ⚠️ 取貨碼已改成 {攤位}-{3 位流水號}（委託方 2026-09-13 指示） */
+const PICKUP_RE = /^.+-\d{3}$/
 
 /**
  * 規格 01 §E 的範例場景：三攤五品項。
@@ -238,10 +238,13 @@ describe('S3-9 拆單與三層金額', () => {
     expect(res.body.totalAmount).toBe(totalFromSubs)
     expect(res.body.totalAmount).toBe(300 + 530 + 180)
 
-    // 每攤各自一組取貨碼，且互不相同
+    // 每攤各自一組取貨碼，且互不相同；前綴是各自的攤位
     const codes = res.body.subOrders.map((s: { pickupCode: string }) => s.pickupCode)
     expect(new Set(codes).size).toBe(3)
     for (const c of codes) expect(c).toMatch(PICKUP_RE)
+    expect(bread.pickupCode).toBe('B03-001')
+    expect(coffee.pickupCode).toBe('B07-001')
+    expect(dumpling.pickupCode).toBe('C01-001')
   })
 
   it('S3-17 下單成功後購物車清空', async () => {
@@ -647,7 +650,7 @@ describe('S3-13 / S3-14 訂單快照與存取權', () => {
 })
 
 describe('S3-16 取貨碼', () => {
-  it('同場次 100 筆訂單的取貨碼全部唯一且符合字元集', async () => {
+  it('同場次 100 筆訂單的取貨碼全部唯一且符合格式', async () => {
     const { app, day, listings } = await setupThreeStalls()
 
     for (let i = 0; i < 100; i += 1) {
@@ -674,9 +677,13 @@ describe('S3-16 取貨碼', () => {
     const codes = subOrders.map((s) => s.pickupCode)
     expect(new Set(codes).size).toBe(100)
     for (const c of codes) expect(c).toMatch(PICKUP_RE)
+    // 同一攤的流水號應該是 001～100，不重號也不跳號
+    const serials = codes.map((c) => Number(/-(\d+)$/.exec(c)![1])).sort((a, b) => a - b)
+    expect(serials[0]).toBe(1)
+    expect(serials.at(-1)).toBe(100)
   }, 60_000)
 
-  it('不同場次可以出現相同取貨碼（每日刷新）', async () => {
+  it('不同場次的流水號各自從 001 起（每日刷新）', async () => {
     const { app, customer, day, listings, stalls, products } = await setupThreeStalls()
     const market = await prisma.marketDay.findUnique({ where: { id: day.id } })
     const day2 = await createMarketDay({
@@ -716,8 +723,9 @@ describe('S3-16 取貨碼', () => {
 
     expect(first.status).toBe(201)
     expect(second.status).toBe(201)
-    // UNIQUE 只在 (market_day_id, pickup_code)，跨場次不受限
+    // UNIQUE 只在 (market_day_id, pickup_code)，跨場次同一個字串可以並存
     const codes = await prisma.subOrder.findMany({ select: { pickupCode: true } })
     expect(codes).toHaveLength(2)
+    expect(codes.every((c) => c.pickupCode === 'B03-001')).toBe(true)
   })
 })

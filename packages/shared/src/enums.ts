@@ -18,10 +18,14 @@ export const NotificationKind = ['NEW_ORDER', 'PICKUP_REMINDER', 'BROADCAST'] as
 export const NotificationStatus = ['QUEUED', 'SENT', 'FAILED', 'SKIPPED_QUOTA'] as const
 export const UserRole = ['user', 'operator'] as const
 
-/** 取貨碼字元集（D-02）：去掉易混淆的 0/O/1/I/L/U/V */
+/**
+ * ⚠️ 取貨碼格式已改為 {攤商位置}-{3 位流水號}（委託方 2026-09-13 指示），
+ * 這兩個常數不再用於產碼，保留是因為 02 §C 的列舉清單有列出。
+ */
 export const PICKUP_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
-/** 取貨碼長度（D-02） */
 export const PICKUP_CODE_LENGTH = 4
+/** 取貨碼流水號位數 */
+export const PICKUP_SERIAL_DIGITS = 3
 
 export type MarketDayStatus = (typeof MarketDayStatus)[number]
 export type ListingStatus = (typeof ListingStatus)[number]

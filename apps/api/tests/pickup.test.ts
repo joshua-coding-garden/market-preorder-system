@@ -37,6 +37,39 @@ describe('S4-7 ~ S4-9 查碼', () => {
     expect(res.body.pickupAt).toBe('10:30')
     expect(res.body.items[0].productName).toBe('可頌')
     expect(res.body.items[0].customNote).toBe('不要太焦')
+    // 取貨碼是「攤位-流水號」
+    expect(code).toBe('B03-001')
+  })
+
+  it('只輸入流水號也查得到（會自動補上自己的攤位前綴）', async () => {
+    const ctx = await setupTwoStalls()
+    await placeOrder(ctx.app, ctx.customer.cookie, ctx.day.id, [
+      { listingId: ctx.listings.toast.id, qty: 1 },
+    ])
+
+    for (const input of ['1', '001', 'b03-1', 'B03-001']) {
+      const res = await request(ctx.app.server)
+        .post(`/api/stalls/${ctx.stallA.id}/market-days/${ctx.day.id}/pickup/lookup`)
+        .set('Cookie', ctx.ownerA.cookie)
+        .send({ code: input })
+      expect(res.status, `輸入「${input}」應查得到`).toBe(200)
+      expect(res.body.pickupCode).toBe('B03-001')
+    }
+  })
+
+  it('別攤的流水號補上自己的前綴後查不到（不會誤查到別攤）', async () => {
+    const ctx = await setupTwoStalls()
+    // B 攤有一筆 B07-001
+    await placeOrder(ctx.app, ctx.customer.cookie, ctx.day.id, [
+      { listingId: ctx.listings.drip.id, qty: 1 },
+    ])
+
+    // A 攤輸入「1」→ 會被補成 B03-001，而 A 攤沒有這筆
+    const res = await request(ctx.app.server)
+      .post(`/api/stalls/${ctx.stallA.id}/market-days/${ctx.day.id}/pickup/lookup`)
+      .set('Cookie', ctx.ownerA.cookie)
+      .send({ code: '1' })
+    expect(res.status).toBe(404)
   })
 
   it('小寫輸入也查得到（現場輸入容錯）', async () => {
@@ -70,7 +103,7 @@ describe('S4-7 ~ S4-9 查碼', () => {
     const garbage = await request(ctx.app.server)
       .post(`/api/stalls/${ctx.stallA.id}/market-days/${ctx.day.id}/pickup/lookup`)
       .set('Cookie', ctx.ownerA.cookie)
-      .send({ code: 'ZZZZ' })
+      .send({ code: 'ZZ-999' })
 
     expect(foreign.status).toBe(404)
     expect(garbage.status).toBe(404)

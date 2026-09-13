@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { PICKUP_ALPHABET, PICKUP_CODE_LENGTH } from './enums.js'
 
 /** 台灣手機：09 開頭共 10 碼（Q-01：只做格式檢查，不驗證） */
 export const phoneSchema = z
@@ -43,13 +42,13 @@ export const inviteCodeSchema = z
   .string()
   .regex(/^[A-Z0-9]{1,4}\d{8}-\d{4}$/, '邀請碼格式不正確')
 
-/** 取貨碼：4 碼，字元集見 PICKUP_ALPHABET（D-02） */
+/**
+ * 取貨碼：{攤商位置}-{3 位流水號}，例 B03-001
+ * ⚠️ 偏離 D-02（委託方 2026-09-13 指示），原本是 4 碼亂碼。
+ */
 export const pickupCodeSchema = z
   .string()
-  .regex(
-    new RegExp(`^[${PICKUP_ALPHABET}]{${PICKUP_CODE_LENGTH}}$`),
-    '取貨碼格式不正確',
-  )
+  .regex(/^.+-\d{3,}$/, '取貨碼格式不正確')
 
 /** 整數金額（TWD，元；B-3 不使用浮點數） */
 export const moneySchema = z.number().int().min(0, '金額不可為負')
