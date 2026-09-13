@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '@/api/client'
 import { toMessage, useApi } from '@/api/useApi'
@@ -96,6 +96,24 @@ function Sheet({
   onClose: () => void
   onPick: (body: { as: 'USER'; userId: string } | { as: 'GUEST' }) => void
 }) {
+  // 手機上背景若還能捲，會讓人以為畫面卡住；開著時鎖住 body
+  useEffect(() => {
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previous
+    }
+  }, [])
+
+  // Esc 關閉
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   const others = targets.filter((t) => t.id !== selfId)
   const stallUsers = others.filter((t) => t.role !== 'operator' && t.stalls.length > 0)
   const customers = others.filter((t) => t.role !== 'operator' && t.stalls.length === 0)
