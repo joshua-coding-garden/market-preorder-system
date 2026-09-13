@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { api } from '@/api/client'
 import { toMessage, useApi } from '@/api/useApi'
 import { FormError } from './form'
@@ -22,6 +23,10 @@ interface TargetsResponse {
  * 不是前端把按鈕藏起來。
  *
  * 這個元件自己管狀態，因此可以同時放在後台標題列與帳號與權限頁。
+ *
+ * modal 用 portal 掛到 document.body：後台標題列有 `backdrop-blur`，
+ * 而 `backdrop-filter` 會為 `position: fixed` 的子元素建立 containing block，
+ * 不脫離的話 modal 會被關在那條標題列裡（只有 1024×94），而不是蓋滿整個視窗。
  */
 export default function ImpersonatePicker({
   variant = 'button',
@@ -62,15 +67,18 @@ export default function ImpersonatePicker({
         以其他身分檢視
       </button>
 
-      {open ? (
-        <Sheet
-          targets={targets.data.items}
-          selfId={selfId}
-          error={error}
-          onClose={() => setOpen(false)}
-          onPick={pick}
-        />
-      ) : null}
+      {open
+        ? createPortal(
+            <Sheet
+              targets={targets.data.items}
+              selfId={selfId}
+              error={error}
+              onClose={() => setOpen(false)}
+              onPick={pick}
+            />,
+            document.body,
+          )
+        : null}
     </>
   )
 }
@@ -105,8 +113,15 @@ function Sheet({
   )
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-4 sm:rounded-2xl">
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/40 p-0 sm:items-center sm:p-4"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between pb-2">
           <h2 className="text-base font-semibold">以其他身分檢視</h2>
           <button
