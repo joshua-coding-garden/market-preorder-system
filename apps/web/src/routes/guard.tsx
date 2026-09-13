@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { Spinner } from '@/components/common'
 import { useSession } from '@/store/session'
 
@@ -16,7 +16,7 @@ export function RequireCapability({
   capability: 'customer' | 'stall' | 'operator'
   children: ReactNode
 }) {
-  const { me, loading } = useSession()
+  const { me, loading, logout } = useSession()
   const location = useLocation()
 
   if (loading) return <Spinner />
@@ -34,6 +34,23 @@ export function RequireCapability({
             ? '您還不是攤商成員。請向主辦單位索取邀請碼後綁定。'
             : '此區域僅限市集主辦單位使用。'}
         </p>
+        {/* 沒有這排的話，換成低權限帳號登入就會困在這頁出不去 */}
+        <div className="mt-6 flex items-center justify-center gap-4 text-sm">
+          <Link to="/" className="text-brand-600">
+            回首頁
+          </Link>
+          <button
+            type="button"
+            className="text-neutral-500"
+            onClick={() => {
+              void logout().then(() => {
+                window.location.href = '/'
+              })
+            }}
+          >
+            登出
+          </button>
+        </div>
       </div>
     )
   }

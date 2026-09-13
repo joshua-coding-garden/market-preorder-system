@@ -4,7 +4,7 @@
 //   GET  /auth/google/start     公開（⚠️ 規格外的暫時登入通道）
 //   GET  /auth/google/callback  公開（⚠️ 規格外）
 //   GET  /auth/providers        公開；回目前可用的登入方式
-//   POST /auth/logout           requireAuth
+//   POST /auth/logout           公開（冪等，只清 cookie）
 //   GET  /me                    requireAuth
 import { randomUUID } from 'node:crypto'
 import type { FastifyPluginAsync, FastifyReply } from 'fastify'
@@ -198,8 +198,10 @@ const authRoutes: FastifyPluginAsync = async (app) => {
 
   // ---------------- Session ----------------
 
-  app.post('/auth/logout', async (req, reply) => {
-    requireAuth(req)
+  // 刻意不要求登入：session 過期、或正在「模擬未登入的訪客」時仍要走得出去，
+  // 否則前端會抱著一個壞掉的 cookie 卡在 401。對未登入者清 cookie 本來就沒有副作用，
+  // 而 session cookie 是 SameSite=Lax，跨站也帶不進來。
+  app.post('/auth/logout', async (_req, reply) => {
     reply.clearSessionCookie()
     reply.clearImpersonatorCookie()
     return { ok: true }

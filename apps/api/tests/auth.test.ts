@@ -190,3 +190,51 @@ describe('S0-6 場次列表只回 PUBLISHED', () => {
     expect(res.body.participations[0].stall.name).toBe('小麥麵包')
   })
 })
+
+describe('登出（POST /api/auth/logout）', () => {
+  it('登出後原本的 cookie 就打不進 /api/me 了', async () => {
+    const app = await getTestApp()
+    const user = await createUser({ role: 'user' })
+
+    const before = await request(app.server).get('/api/me').set('Cookie', user.cookie)
+    expect(before.status).toBe(200)
+
+    const out = await request(app.server).post('/api/auth/logout').set('Cookie', user.cookie)
+    expect(out.status).toBe(200)
+    expect(out.body.ok).toBe(true)
+
+    // 瀏覽器會照 Set-Cookie 把 cookie 清掉，所以之後就是未登入狀態
+    const cleared = (out.headers['set-cookie'] as unknown as string[]).find((c) =>
+      c.startsWith(`${config.sessionCookieName}=`),
+    )
+    expect(cleared).toBeDefined()
+    expect(cleared).toMatch(/Expires=Thu, 01 Jan 1970|Max-Age=0/)
+
+    const after = await request(app.server).get('/api/me')
+    expect(after.status).toBe(401)
+  })
+
+  it('沒有 session 也能登出（回 200，不是 401）', async () => {
+    // session 過期、或正在「模擬未登入的訪客」時仍要走得出去，
+    // 否則瀏覽器會抱著一個壞掉的 cookie 卡住。
+    const app = await getTestApp()
+
+    const res = await request(app.server).post('/api/auth/logout')
+
+    expect(res.status).toBe(200)
+    expect(res.body.ok).toBe(true)
+  })
+
+  it('同時清掉身分模擬的 cookie', async () => {
+    const app = await getTestApp()
+    const user = await createUser({ role: 'operator' })
+
+    const res = await request(app.server)
+      .post('/api/auth/logout')
+      .set('Cookie', [user.cookie, 'mp_impersonator=whatever'].join('; '))
+
+    const names = (res.headers['set-cookie'] as unknown as string[]).map((c) => c.split('=')[0])
+    expect(names).toContain(config.sessionCookieName)
+    expect(names).toContain('mp_impersonator')
+  })
+})

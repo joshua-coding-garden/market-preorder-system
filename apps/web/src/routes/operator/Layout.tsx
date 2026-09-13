@@ -1,4 +1,5 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
+import AuthMenu from '@/components/AuthMenu'
 import ImpersonatePicker from '@/components/ImpersonatePicker'
 import { useSession } from '@/store/session'
 
@@ -27,9 +28,7 @@ export default function OperatorLayout() {
           </Link>
           <div className="flex shrink-0 items-center gap-2">
             <ImpersonatePicker variant="compact" selfId={me?.id} />
-            <Link to="/" className="text-sm text-neutral-600">
-              回顧客頁
-            </Link>
+            <AuthMenu />
           </div>
         </div>
         {/* 換行而不是橫向捲動，手機上最後一個分頁才不會被切掉 */}

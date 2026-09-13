@@ -1,4 +1,5 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
+import AuthMenu from '@/components/AuthMenu'
 import { useSession } from '@/store/session'
 
 /** 顧客 View 外框（05 §顧客 View） */
@@ -21,13 +22,7 @@ export default function CustomerLayout() {
             >
               我的訂單
             </NavLink>
-            {me ? (
-              <span className="max-w-24 truncate text-neutral-500">{me.displayName}</span>
-            ) : (
-              <Link to="/login" className="text-neutral-600">
-                登入
-              </Link>
-            )}
+            <AuthMenu />
           </nav>
         </div>
       </div>

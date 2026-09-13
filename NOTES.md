@@ -597,7 +597,7 @@ D-12 說正式環境用 S3 相容儲存。目前設成 `s3` 會丟出明確錯�
 
 ## 規格外的追加（委託方 2026-09-12 口頭指示）
 
-以下五項**不在 spec 內**，都標成可拔除：
+以下幾項**不在 spec 內**，都標成可拔除：
 
 1. **帳號密碼註冊／登入**（`/auth/local/*`）—— LINE、Google 都還沒申請下來時的登入通道。
    詳見下一節。
@@ -608,8 +608,9 @@ D-12 說正式環境用 S3 相容儲存。目前設成 `s3` 會丟出明確錯�
 5. **`GET /operator/message-quota`** —— O1 儀表板顯示額度所需，但 §10 未列出（規格缺口）。
 6. **特製備註改為「每個商品項目一個」**（2026-09-13 指示）—— 見下節。
 7. **取貨碼改為「攤商位置-流水號」**（2026-09-13 指示）—— 見下節。
+8. **登入／登出入口**（2026-09-13 指示）—— 見下節。
 
-這五項讓「新增的 API 都在 03-API契約.md 有對應」這條 DoD 不成立。
+這幾項讓「新增的 API 都在 03-API契約.md 有對應」這條 DoD 不成立。
 要回到純規格狀態，照各段落的移除方式處理即可。
 
 ### 特製備註的層級變更（偏離 01 §A、05 §C4、schema.sql）
@@ -698,6 +699,51 @@ DROP TABLE local_credential;
 `registerLocalUser`／`loginLocalUser`、`routes.ts` 的 `/auth/local/*` 兩支 route、
 `schema.prisma` 的 `LocalCredential` model 與 `AppUser.localCredential`、
 以及 C9 登入頁的表單區塊，最後把 `.env` 的 `LOCAL_LOGIN_ENABLED` 拿掉。
+
+### 登入／登出入口（05 未定義）
+
+**背景**：`05-畫面與互動.md` 只畫了 C9 登入頁，沒有規定標題列要放什麼。
+做到這裡才發現全站**沒有任何登出入口** —— `store/session.tsx` 的 `logout()`
+寫好了但沒有任何地方呼叫，`POST /api/auth/logout` 從來沒被前端打過。
+
+**做法**：新增 `components/AuthMenu.tsx`，三個 View 的標題列共用：
+
+| 狀態 | 顯示 |
+|---|---|
+| 未登入 | 「登入」連結，帶 `?redirect=` 回目前這頁 |
+| 已登入 | 名字按鈕 → 彈出「帳號」面板：身分說明、各區捷徑、登出 |
+| 身分模擬中 | **不顯示**（見下） |
+
+彈出面板抽成共用的 `components/Sheet.tsx`（`ImpersonatePicker` 也改用它）。
+一定要用 portal 掛到 `document.body`：三個標題列都有 `backdrop-blur`，
+而 `backdrop-filter` 會替 `position: fixed` 子元素建立 containing block。
+
+**模擬中不顯示的理由**：`POST /auth/logout` 會連 `mp_impersonator` 一起清掉，
+管理員按下去會直接被登出、回不到原本帳號。那個狀態下畫面最上面本來就有
+`ImpersonationBar` 的「結束模擬」，出口已經有了。
+
+**連帶的兩處修改**：
+
+1. `POST /auth/logout` 拿掉 `requireAuth`，改成**冪等**：一律清 cookie 回 200。
+   session 過期、或正在「模擬未登入的訪客」時原本會拿到 401，
+   瀏覽器反而抱著壞掉的 cookie 出不去。cookie 是 `SameSite=Lax`，跨站帶不進來。
+2. `routes/guard.tsx` 的「沒有權限」畫面加上「回首頁／登出」——
+   原本換成低權限帳號登入就會困在那頁，沒有任何離開的連結。
+
+**版面連帶調整**：後台標題列原本是「以其他身分檢視 + 回顧客頁」，
+再塞一顆帳號按鈕會變成 400px、在 375px 溢出。
+把「回顧客頁」收進帳號面板（攤商／後台頁才顯示），標題列只留兩顆。
+攤商頁也一併照辦，兩邊一致。
+
+> ⚠️ 量 375px 溢出時**不要**用 CDP 的 `mobile: true`：Chrome 會對超寬內容做
+> shrink-to-fit，把 layout viewport 撐大到 401，於是
+> `scrollWidth === innerWidth` 永遠成立，變成假綠燈。要用 `mobile: false`
+> 把 viewport 鎖死在 375。這次就是靠這點才抓到上面那個溢出。
+
+**移除方式**：刪掉 `components/AuthMenu.tsx`、把三個 Layout 的 `<AuthMenu />`
+換回原本的「登入」連結／「回顧客頁」連結，並把 `/auth/logout` 的 `requireAuth` 加回去。
+（`components/Sheet.tsx` 可以留著，`ImpersonatePicker` 在用。）
+
 
 ## Non-goals 確認（00 §C）
 

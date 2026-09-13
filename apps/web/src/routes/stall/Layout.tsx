@@ -1,4 +1,5 @@
 import { Link, Outlet } from 'react-router-dom'
+import AuthMenu from '@/components/AuthMenu'
 import { useSession } from '@/store/session'
 
 /** 攤商 View 外框（05 §攤商 View） */
@@ -12,9 +13,7 @@ export default function StallLayout() {
           <Link to="/stall" className="text-base font-bold text-brand-600">
             攤商專區
           </Link>
-          <Link to="/" className="text-sm text-neutral-600">
-            回顧客頁
-          </Link>
+          <AuthMenu />
         </div>
         {me && me.stalls.length > 0 ? (
           <p className="mt-1 text-xs text-neutral-500">
