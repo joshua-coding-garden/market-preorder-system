@@ -66,7 +66,8 @@ describe('S3-2 相同內容物組合累加數量', () => {
         marketDayId: day.id,
         listingId: listing.id,
         qty: 2,
-        components: [{ componentId: cheese.id, customNote: '不要太焦' }],
+        components: [{ componentId: cheese.id }],
+        customNote: '不要太焦',
       })
     expect(first.status).toBe(201)
 
@@ -77,7 +78,8 @@ describe('S3-2 相同內容物組合累加數量', () => {
         marketDayId: day.id,
         listingId: listing.id,
         qty: 1,
-        components: [{ componentId: cheese.id, customNote: '不要太焦' }],
+        components: [{ componentId: cheese.id }],
+        customNote: '不要太焦',
       })
     expect(second.status).toBe(200)
     expect(second.body.merged).toBe(true)
@@ -118,7 +120,7 @@ describe('S3-3 不同內容物組合新增一列', () => {
     expect(await prisma.cartItem.count()).toBe(2)
   })
 
-  it('備註不同也視為不同列', async () => {
+  it('備註不同也視為不同列（備註現在是項目層）', async () => {
     const { app, customer, day, listing, product } = await setup()
     const cheese = product.components[0]
 
@@ -129,7 +131,8 @@ describe('S3-3 不同內容物組合新增一列', () => {
         marketDayId: day.id,
         listingId: listing.id,
         qty: 1,
-        components: [{ componentId: cheese.id, customNote: '不要太焦' }],
+        components: [{ componentId: cheese.id }],
+        customNote: '不要太焦',
       })
     await request(app.server)
       .post('/api/cart/items')
@@ -138,7 +141,8 @@ describe('S3-3 不同內容物組合新增一列', () => {
         marketDayId: day.id,
         listingId: listing.id,
         qty: 1,
-        components: [{ componentId: cheese.id, customNote: '烤久一點' }],
+        components: [{ componentId: cheese.id }],
+        customNote: '烤久一點',
       })
 
     expect(await prisma.cartItem.count()).toBe(2)
@@ -230,7 +234,8 @@ describe('購物車內容與金額', () => {
         marketDayId: day.id,
         listingId: listing.id,
         qty: 2,
-        components: [{ componentId: cheese.id, customNote: '不要太焦' }],
+        components: [{ componentId: cheese.id }],
+        customNote: '不要太焦',
       })
 
     const res = await request(app.server)
@@ -245,7 +250,8 @@ describe('購物車內容與金額', () => {
     expect(res.body.stalls[0].items[0].lineTotal).toBe(180)
     expect(res.body.stalls[0].subtotal).toBe(180)
     expect(res.body.total).toBe(180)
-    expect(res.body.stalls[0].items[0].components[0].customNote).toBe('不要太焦')
+    expect(res.body.stalls[0].items[0].customNote).toBe('不要太焦')
+    expect(res.body.stalls[0].items[0].components[0].name).toBe('加起司')
   })
 
   it('listing 變 SOLD_OUT 時標記 unavailable', async () => {

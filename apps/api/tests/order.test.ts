@@ -164,7 +164,8 @@ describe('S3-9 拆單與三層金額', () => {
       marketDayId: day.id,
       listingId: listings.croissant.id,
       qty: 2,
-      components: [{ componentId: products.croissant.components[0].id, customNote: '不要太焦' }],
+      components: [{ componentId: products.croissant.components[0].id }],
+      customNote: '不要太焦',
     })
     await addToCart(app, customer.cookie, {
       marketDayId: day.id,
@@ -213,9 +214,8 @@ describe('S3-9 拆單與三層金額', () => {
     expect(croissantLine.unitPrice).toBe(80)
     expect(croissantLine.qty).toBe(2)
     expect(croissantLine.lineTotal).toBe(180)
-    expect(croissantLine.components).toEqual([
-      { name: '加起司', extraPrice: 10, customNote: '不要太焦' },
-    ])
+    expect(croissantLine.customNote).toBe('不要太焦')
+    expect(croissantLine.components).toEqual([{ name: '加起司', extraPrice: 10 }])
 
     // 山上咖啡：(250+0)×1 = 250、(120+20)×2 = 280 → 530
     const coffee = byStall['山上咖啡']

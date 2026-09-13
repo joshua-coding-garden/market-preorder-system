@@ -93,10 +93,15 @@ export default function Cart() {
                                 <li key={c.componentId} className="text-xs text-neutral-500">
                                   ・{c.name}
                                   {c.extraPrice > 0 ? ` +${c.extraPrice}` : ''}
-                                  {c.customNote ? `（${c.customNote}）` : ''}
                                 </li>
                               ))}
                             </ul>
+                          ) : null}
+
+                          {item.customNote ? (
+                            <p className="mt-1 rounded bg-amber-50 px-1.5 py-1 text-xs text-amber-900">
+                              備註：{item.customNote}
+                            </p>
                           ) : null}
 
                           <p className="mt-1 text-xs text-neutral-500">

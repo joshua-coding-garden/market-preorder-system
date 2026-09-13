@@ -7,15 +7,11 @@ export interface CartItem {
   unitPrice: number
   qty: number
   lineTotal: number
+  customNote: string | null
   status: string
   unavailable: boolean
   maxQty: number | null
-  components: {
-    componentId: string
-    name: string
-    extraPrice: number
-    customNote: string | null
-  }[]
+  components: { componentId: string; name: string; extraPrice: number }[]
 }
 
 export interface CartData {
@@ -44,7 +40,8 @@ export interface OrderSubOrder {
     unitPrice: number
     qty: number
     lineTotal: number
-    components: { name: string; extraPrice: number; customNote: string | null }[]
+    customNote: string | null
+    components: { name: string; extraPrice: number }[]
   }[]
 }
 

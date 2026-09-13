@@ -30,7 +30,8 @@ interface OperatorSubOrder {
     productName: string
     qty: number
     lineTotal: number
-    components: { name: string; customNote: string | null }[]
+    customNote: string | null
+    components: { name: string }[]
   }[]
 }
 

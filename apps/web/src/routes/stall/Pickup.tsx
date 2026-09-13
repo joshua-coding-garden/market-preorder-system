@@ -165,16 +165,14 @@ export default function Pickup() {
                   {item.components.length > 0 ? (
                     <ul className="mt-1">
                       {item.components.map((c, j) => (
-                        <li key={j} className="text-base text-neutral-600">
-                          ・{c.name}
-                          {c.customNote ? (
-                            <span className="ml-1 rounded bg-amber-100 px-1.5 text-amber-900">
-                              {c.customNote}
-                            </span>
-                          ) : null}
-                        </li>
+                        <li key={j} className="text-base text-neutral-600">・{c.name}</li>
                       ))}
                     </ul>
+                  ) : null}
+                  {item.customNote ? (
+                    <p className="mt-1 rounded-lg bg-amber-100 px-2 py-1 text-base font-semibold text-amber-900">
+                      備註：{item.customNote}
+                    </p>
                   ) : null}
                 </li>
               ))}

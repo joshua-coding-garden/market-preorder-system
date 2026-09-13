@@ -115,10 +115,8 @@ export async function placeOrder(
         marketDayId: dayId,
         listingId: item.listingId,
         qty: item.qty,
-        components: (item.componentIds ?? []).map((componentId) => ({
-          componentId,
-          ...(item.note ? { customNote: item.note } : {}),
-        })),
+        components: (item.componentIds ?? []).map((componentId) => ({ componentId })),
+        ...(item.note ? { customNote: item.note } : {}),
       })
     if (res.status >= 400) throw new Error(`加入購物車失敗：${JSON.stringify(res.body)}`)
   }

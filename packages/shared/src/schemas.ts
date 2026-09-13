@@ -225,7 +225,6 @@ export const listingQuerySchema = z.object({
 
 export const cartItemComponentSchema = z.object({
   componentId: uuidSchema,
-  customNote: z.string().trim().max(100).optional(),
 })
 
 export const addCartItemSchema = z.object({
@@ -233,6 +232,11 @@ export const addCartItemSchema = z.object({
   listingId: uuidSchema,
   qty: z.number().int().min(1).max(99),
   components: z.array(cartItemComponentSchema).max(30).default([]),
+  /**
+   * ⚠️ 偏離 05 §C4（委託方 2026-09-13 指示）：
+   * 備註從「每個內容物一個」改成「每個商品項目一個」。
+   */
+  customNote: z.string().trim().max(100).optional(),
 })
 export type AddCartItemInput = z.infer<typeof addCartItemSchema>
 

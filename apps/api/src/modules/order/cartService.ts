@@ -10,14 +10,14 @@ import { AppError, notFound } from '../../lib/errors.js'
  *   - 已選內容物不可編輯，要改就刪掉重加
  */
 
-/** 把內容物組合正規化成可比較的字串（含備註，備註不同視為不同列） */
-function componentKey(
-  components: { componentId: string; customNote?: string | null }[],
-): string {
-  return components
-    .map((c) => `${c.componentId}:${(c.customNote ?? '').trim()}`)
-    .sort()
-    .join('|')
+/** 把內容物組合正規化成可比較的字串 */
+function componentKey(components: { componentId: string }[]): string {
+  return components.map((c) => c.componentId).sort().join('|')
+}
+
+/** 同 listing + 相同內容物組合 + 相同備註才算同一列 */
+function lineKey(components: { componentId: string }[], note: string | null): string {
+  return `${componentKey(components)}#${(note ?? '').trim()}`
 }
 
 async function getOrCreateCart(userId: string, marketDayId: string) {
@@ -76,6 +76,7 @@ export async function getCart(userId: string, marketDayId: string) {
       unitPrice: item.listing.price,
       qty: item.qty,
       lineTotal: (item.listing.price + extras) * item.qty,
+      customNote: item.customNote,
       status: item.listing.status,
       unavailable,
       maxQty: item.listing.maxQty,
@@ -83,7 +84,6 @@ export async function getCart(userId: string, marketDayId: string) {
         componentId: c.componentId,
         name: c.component.name,
         extraPrice: c.component.extraPrice,
-        customNote: c.customNote,
       })),
     }
   }
@@ -138,22 +138,18 @@ export async function addCartItem(userId: string, input: AddCartItemInput) {
       throw new AppError('VALIDATION', '選擇的內容物不存在')
     }
   }
-  // allow_custom_note=false 的項目不接受備註
-  const noteBlocked = listing.product.components.filter(
-    (c) => !c.allowCustomNote && input.components.some((i) => i.componentId === c.id && i.customNote),
-  )
-  if (noteBlocked.length > 0) {
-    throw new AppError('VALIDATION', `「${noteBlocked[0].name}」不接受特製備註`)
-  }
+  const note = input.customNote?.trim() || null
 
   const cart = await getOrCreateCart(userId, input.marketDayId)
-  const wantedKey = componentKey(input.components)
+  const wantedKey = lineKey(input.components, note)
 
   const existing = await prisma.cartItem.findMany({
     where: { cartId: cart.id, listingId: input.listingId },
     include: { components: true },
   })
-  const match = existing.find((item) => componentKey(item.components) === wantedKey)
+  const match = existing.find(
+    (item) => lineKey(item.components, item.customNote) === wantedKey,
+  )
 
   if (match) {
     // 同 listing + 相同內容物組合 → 數量累加（S3-2）
@@ -170,11 +166,9 @@ export async function addCartItem(userId: string, input: AddCartItemInput) {
       cartId: cart.id,
       listingId: input.listingId,
       qty: input.qty,
+      customNote: note,
       components: {
-        create: input.components.map((c) => ({
-          componentId: c.componentId,
-          customNote: c.customNote?.trim() || null,
-        })),
+        create: input.components.map((c) => ({ componentId: c.componentId })),
       },
     },
   })

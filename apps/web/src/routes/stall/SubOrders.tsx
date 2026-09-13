@@ -26,7 +26,8 @@ export interface StallSubOrder {
     unitPrice: number
     qty: number
     lineTotal: number
-    components: { name: string; extraPrice: number; customNote: string | null }[]
+    customNote: string | null
+    components: { name: string; extraPrice: number }[]
   }[]
 }
 

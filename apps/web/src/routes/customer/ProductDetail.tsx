@@ -4,7 +4,7 @@ import { ApiError, api } from '@/api/client'
 import { toMessage, useApi } from '@/api/useApi'
 import { ErrorState, MoneyTWD, Spinner } from '@/components/common'
 import ComponentPicker, { type ComponentSelection } from '@/components/ComponentPicker'
-import { FormError, Toast } from '@/components/form'
+import { FormError, Toast, inputClass } from '@/components/form'
 import { useSession } from '@/store/session'
 import type { PublicListing } from './MarketDayPage'
 
@@ -16,6 +16,7 @@ export default function ProductDetail() {
   const listings = useApi<{ items: PublicListing[] }>(`/market-days/${dayId}/listings`)
 
   const [selected, setSelected] = useState<ComponentSelection[]>([])
+  const [note, setNote] = useState('')
   const [qty, setQty] = useState(1)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -51,10 +52,8 @@ export default function ProductDetail() {
         marketDayId: dayId,
         listingId,
         qty,
-        components: selected.map((s) => ({
-          componentId: s.componentId,
-          ...(s.customNote?.trim() ? { customNote: s.customNote.trim() } : {}),
-        })),
+        components: selected.map((s) => ({ componentId: s.componentId })),
+        ...(note.trim() ? { customNote: note.trim() } : {}),
       })
       setToast('已加入購物車')
       setTimeout(() => navigate(`/days/${dayId}`), 700)
@@ -107,6 +106,25 @@ export default function ProductDetail() {
           onChange={setSelected}
           disabled={soldOut}
         />
+
+        <div>
+          <label htmlFor="item-note" className="text-sm font-medium text-neutral-700">
+            特製備註
+          </label>
+          <p className="mt-0.5 text-xs text-neutral-500">
+            這一項要跟攤商說的話，例如「不要太焦」
+          </p>
+          <textarea
+            id="item-note"
+            className={`${inputClass} mt-2`}
+            rows={2}
+            maxLength={100}
+            placeholder="選填"
+            value={note}
+            disabled={soldOut}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </div>
 
         <div>
           <span className="text-sm font-medium text-neutral-700">數量</span>

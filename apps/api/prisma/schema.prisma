@@ -318,6 +318,8 @@ model CartItem {
   cartId    String   @map("cart_id") @db.Uuid
   listingId String   @map("listing_id") @db.Uuid
   qty       Int
+  /// ⚠️ 偏離 schema.sql：特製備註改為每個商品項目一個（委託方 2026-09-13 指示）
+  customNote String? @map("custom_note")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   cart       Cart                @relation(fields: [cartId], references: [id], onDelete: Cascade)
@@ -407,6 +409,8 @@ model OrderItem {
   qty         Int
   /// (unit_price + Σ extra) × qty
   lineTotal   Int     @map("line_total")
+  /// ⚠️ 偏離 schema.sql：特製備註改為每個商品項目一個（委託方 2026-09-13 指示）
+  customNote  String? @map("custom_note")
 
   subOrder   SubOrder             @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
   listing    Listing?             @relation(fields: [listingId], references: [id], onDelete: SetNull)

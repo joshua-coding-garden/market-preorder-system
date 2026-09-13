@@ -36,7 +36,7 @@ describe('S4-7 ~ S4-9 查碼', () => {
     expect(res.body.contactName).toBe('小美')
     expect(res.body.pickupAt).toBe('10:30')
     expect(res.body.items[0].productName).toBe('可頌')
-    expect(res.body.items[0].components[0].customNote).toBe('不要太焦')
+    expect(res.body.items[0].customNote).toBe('不要太焦')
   })
 
   it('小寫輸入也查得到（現場輸入容錯）', async () => {

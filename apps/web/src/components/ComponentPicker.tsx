@@ -9,7 +9,6 @@ export interface ComponentOption {
 
 export interface ComponentSelection {
   componentId: string
-  customNote?: string
 }
 
 interface Props {
@@ -21,8 +20,10 @@ interface Props {
 
 /**
  * ComponentPicker（05 §共用元件）：內容物複選 + 特製備註。
- * D-04：每項有加價（≥0），顧客可勾 0～N 項，勾選後才顯示備註輸入
- * （且該項 allow_custom_note 為 true 時才有）。
+ * D-04：每項有加價（≥0），顧客可勾 0～N 項。
+ *
+ * ⚠️ 偏離 05 §C4（委託方 2026-09-13 指示）：
+ * 特製備註原本每個內容物一個，已改成每個商品項目一個，由 C4 在最下方統一收。
  */
 export default function ComponentPicker({ options, value, onChange, disabled }: Props) {
   if (options.length === 0) return null
@@ -35,12 +36,6 @@ export default function ComponentPicker({ options, value, onChange, disabled }: 
     } else {
       onChange([...value, { componentId: option.id }])
     }
-  }
-
-  const setNote = (componentId: string, note: string) => {
-    onChange(
-      value.map((v) => (v.componentId === componentId ? { ...v, customNote: note } : v)),
-    )
   }
 
   return (
@@ -77,16 +72,6 @@ export default function ComponentPicker({ options, value, onChange, disabled }: 
                 </span>
               </label>
 
-              {picked && option.allowCustomNote ? (
-                <input
-                  className="mt-2 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500"
-                  placeholder="特製備註（例：不要太焦）"
-                  maxLength={100}
-                  value={picked.customNote ?? ''}
-                  disabled={disabled}
-                  onChange={(e) => setNote(option.id, e.target.value)}
-                />
-              ) : null}
             </li>
           )
         })}

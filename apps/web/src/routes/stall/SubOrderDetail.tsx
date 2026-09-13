@@ -108,14 +108,14 @@ export default function SubOrderDetail() {
                         <li key={j} className="text-xs text-neutral-600">
                           ・{c.name}
                           {c.extraPrice > 0 ? ` +${c.extraPrice}` : ''}
-                          {c.customNote ? (
-                            <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-amber-900">
-                              {c.customNote}
-                            </span>
-                          ) : null}
                         </li>
                       ))}
                     </ul>
+                  ) : null}
+                  {item.customNote ? (
+                    <p className="mt-1 rounded bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900">
+                      備註：{item.customNote}
+                    </p>
                   ) : null}
                   <p className="mt-1 text-xs text-neutral-500">
                     單價 <MoneyTWD value={item.unitPrice} /> × {item.qty}

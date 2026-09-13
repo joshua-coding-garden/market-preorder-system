@@ -67,10 +67,10 @@ async function serializeOrder(preorderId: string, client = prisma) {
         unitPrice: i.unitPrice,
         qty: i.qty,
         lineTotal: i.lineTotal,
+        customNote: i.customNote,
         components: i.components.map((c) => ({
           name: c.name,
           extraPrice: c.extraPrice,
-          customNote: c.customNote,
         })),
       })),
     })),
@@ -254,12 +254,12 @@ export async function createOrder(
             unitPrice,
             qty: item.qty,
             lineTotal,
+            customNote: item.customNote,
             components: {
               create: item.components.map((c) => ({
                 componentId: c.componentId,
                 name: c.component.name,
                 extraPrice: c.component.extraPrice,
-                customNote: c.customNote,
               })),
             },
           },
