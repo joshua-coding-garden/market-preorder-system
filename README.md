@@ -90,13 +90,15 @@ pnpm dev        # 3. 啟動 API 與前端（一定要在 tunnel 之後，才會�
 - 自動把網址寫回 `.env` 的 `WEB_URL`、`LINE_LOGIN_CALLBACK_URL`，
   並把 `COOKIE_SECURE` 設成 `true`（通道是 HTTPS）。
 
-然後到 **LINE Console → LINE Login → Callback URL** 貼上腳本印出的那行
-（`https://xxxx.ngrok-free.app/api/auth/line/callback`），手機開公開網址就能登入。
+把印出的公開網址照下面「LINE Developers Console 設定」填進三個地方
+（Callback URL、Webhook URL、LIFF Endpoint URL），手機 LINE 加官方帳號好友就能從歡迎訊息點進來。
+
+> `pnpm tunnel` 改寫 `.env` 後，API 要重啟才會讀到（`tsx watch` 不會重讀 `.env`）。
 
 ### ngrok 免費方案的兩個坑
 
 1. **每次重開 `pnpm tunnel`，網址都會變。**
-   `.env` 會自動更新，但你必須：重跑 `pnpm dev`、並回 LINE Console 換掉 Callback URL。
+   `.env` 會自動更新，但你必須：重跑 `pnpm dev`、回 LINE Console 換掉三個網址、重跑 `pnpm line:richmenu`。
    受不了的話就升級 ngrok 付費版用固定網域，或直接部署到正式環境。
 2. **第一次進站會有一頁 ngrok 警告**（`ERR_NGROK_6024`），按「Visit Site」即可，
    之後 ngrok 會種 cookie 不再顯示。
@@ -176,10 +178,28 @@ pnpm test
      （`https://xxxx.ngrok-free.app/api/auth/line/callback`）；
      **`localhost` 不會被 LINE 接受**
    - `OpenID Connect` 需啟用（本系統用 ID token 在伺服器端驗證身分）
-3. 在**同一個 Provider** 下建立 **Messaging API channel**（Sprint 5 才會用到）：
+3. 在**同一個 Provider** 下建立 **Messaging API channel**（官方帳號，顧客要加的好友）：
    - `Channel secret` → `LINE_MESSAGING_CHANNEL_SECRET`
-   - 發行 `Channel access token` → `LINE_MESSAGING_CHANNEL_ACCESS_TOKEN`
-4. LIFF app（Sprint 5 才會用到）：在 LINE Login channel 下新增，`LIFF ID` → `LIFF_ID`。
+   - 發行 `Channel access token`（long-lived）→ `LINE_MESSAGING_CHANNEL_ACCESS_TOKEN`
+   - **Messaging API 分頁 → Webhook URL** 填 `{WEB_URL}/api/line/webhook`，開啟 `Use webhook`，按 `Verify` 應回成功
+   - 到 **LINE Official Account Manager → 回應設定**：關掉「自動回應訊息」與「加入好友的歡迎訊息」，
+     否則官方帳號的罐頭訊息會跟本系統的歡迎訊息一起出現
+4. **LIFF app**（讓使用者從 LINE 點進來時自動登入）：在 **LINE Login channel → LIFF 分頁** 新增
+   - `Endpoint URL`：填 `WEB_URL`（例如 `https://xxxx.ngrok-free.app`，不要加路徑）
+   - `Size`：Full；`Scopes`：勾 `openid` 與 `profile`（沒勾 `openid` 拿不到 ID token，登不進來）
+   - `Add friend option`：`On (normal)`，還不是好友的人會在授權畫面看到加好友的勾選框
+   - `LIFF ID` → `.env` 的 `LIFF_ID`
+5. 在 LINE Login channel 的 **Basic settings** 把 `Linked OA` 選成第 3 步的官方帳號。
+6. 重啟 API，執行 `pnpm line:richmenu` 建立圖文選單（連結會是 LIFF 網址）。
+
+### LINE 入口流程（0916）
+
+1. 使用者加官方帳號好友 → webhook 收到 `follow`，建立帳號並回歡迎訊息，
+   三個按鈕：本週市集、我的訂單、我是攤商（邀請碼綁定頁）。
+2. 按鈕與圖文選單都是 LIFF 網址 `https://liff.line.me/{LIFF_ID}/路徑`，在 LINE 內開啟。
+3. 前端啟動時 `liff.init()` 還原路徑，若尚未登入就拿 LIFF 的 ID token 打
+   `POST /api/auth/line/liff`，伺服器驗證後簽發 session。使用者不用按任何登入按鈕。
+4. 沒設 `LIFF_ID` 時，按鈕退回一般網址，使用者點開後要按一次「使用 LINE 登入」。
 
 ### 把自己設成廠商（operator）
 

@@ -4,11 +4,13 @@
  * 三格：左「本週市集」→ /、中「我的訂單」→ /orders、右「攤商專區」→ /stall
  * 規格要求用 script 建立，不手動設定。
  *
- * 重複執行會先刪掉同名的舊選單再重建，因此可以安全重跑。
+ * 連結用 appLink()：有設 LIFF_ID 就是 LIFF 網址（LINE 內點開直接登入），
+ * 沒設就是 WEB_URL。重複執行會先刪掉同名的舊選單再重建，因此可以安全重跑。
  */
 import { Buffer } from 'node:buffer'
 import { messagingApi } from '@line/bot-sdk'
 import { config } from '../src/config.js'
+import { appLink } from '../src/lib/line/messages.js'
 
 const RICH_MENU_NAME = 'market-preorder-main'
 const WIDTH = 2500
@@ -34,7 +36,7 @@ async function renderImage(): Promise<Buffer> {
     <line x1="${x}" y1="0" x2="${x}" y2="${HEIGHT}" stroke="#f5d0a9" stroke-width="${i === 0 ? 0 : 4}"/>
     <text x="${x + CELL / 2}" y="${HEIGHT / 2 + 40}" font-size="110" font-weight="bold"
           text-anchor="middle" fill="#c2410c"
-          font-family="Noto Sans TC, PingFang TC, Microsoft JhengHei, sans-serif">${b.label}</text>`
+          font-family="Noto Sans CJK TC, Noto Sans TC, PingFang TC, Microsoft JhengHei, sans-serif">${b.label}</text>`
   }).join('')}
 </svg>`
 
@@ -70,7 +72,7 @@ async function main(): Promise<void> {
     chatBarText: '開啟選單',
     areas: BUTTONS.map((b, i) => ({
       bounds: { x: i * CELL, y: 0, width: CELL, height: HEIGHT },
-      action: { type: 'uri' as const, label: b.label, uri: `${config.WEB_URL}${b.path}` },
+      action: { type: 'uri' as const, label: b.label, uri: appLink(b.path) },
     })),
   })
 
@@ -78,11 +80,14 @@ async function main(): Promise<void> {
   await api.setDefaultRichMenu(created.richMenuId)
 
   console.log('圖文選單建立完成：', created.richMenuId)
-  console.log('  左：本週市集 →', `${config.WEB_URL}/`)
-  console.log('  中：我的訂單 →', `${config.WEB_URL}/orders`)
-  console.log('  右：攤商專區 →', `${config.WEB_URL}/stall`)
+  for (const b of BUTTONS) console.log(`  ${b.label} →`, appLink(b.path))
   console.log('')
-  console.log('提醒：WEB_URL 換了（例如 ngrok 重開）就要重跑這支。')
+  console.log(
+    config.LIFF_ID
+      ? '連結是 LIFF 網址，LINE 內點開會直接登入。'
+      : '提醒：尚未設定 LIFF_ID，連結是一般網址，使用者點開後還要按一次 LINE 登入。',
+  )
+  console.log('提醒：WEB_URL 或 LIFF_ID 換了（例如 ngrok 重開）就要重跑這支。')
 }
 
 main().catch((err) => {

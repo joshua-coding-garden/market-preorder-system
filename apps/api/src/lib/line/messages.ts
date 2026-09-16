@@ -3,28 +3,61 @@ import type { LineMessage } from './client.js'
 
 /**
  * 訊息樣板（04 §E）。全部繁體中文。
- * 按鈕連到 WEB_URL；LINE 內開啟時走 LIFF，外部瀏覽器則是一般網頁。
+ *
+ * 按鈕連結一律用 appLink()：有設 LIFF_ID 時是 LIFF 網址，
+ * 在 LINE 內點開會直接以 LINE 身分登入，不用再按一次登入（0916 入口流程）；
+ * 沒設 LIFF_ID 就退回 WEB_URL，外部瀏覽器走一般 LINE Login。
  */
 
+/** 圖片等靜態資源的絕對網址（LINE 要求公開 HTTPS，不能是 LIFF 網址） */
 function webUrl(path: string): string {
   return `${config.WEB_URL}${path}`
 }
 
-/** 歡迎訊息（follow 事件） */
+/**
+ * 組出使用者點擊後要開的網址（純函式，方便測試）。
+ * LIFF 網址格式：https://liff.line.me/{LIFF_ID}{path}
+ * 前端的 liff.init() 會把 path 還原成 endpoint URL 底下的路徑（liff.state）。
+ */
+export function buildAppLink(path: string, opts: { liffId: string; webUrl: string }): string {
+  const normalized = path.startsWith('/') ? path : `/${path}`
+  return opts.liffId
+    ? `https://liff.line.me/${opts.liffId}${normalized}`
+    : `${opts.webUrl}${normalized}`
+}
+
+export function appLink(path: string): string {
+  return buildAppLink(path, { liffId: config.LIFF_ID, webUrl: config.WEB_URL })
+}
+
+/**
+ * 歡迎訊息（follow 事件）。
+ * 0916 入口流程：加入好友 → 點按鈕 → 以 LINE 身分完成註冊並進入網頁。
+ */
 export function welcomeMessage(): LineMessage[] {
   return [
     {
       type: 'text',
-      text: '歡迎加入！這裡可以預購週末市集的商品，到現場出示取貨碼付款取貨。\n\n攤商請輸入：邀請碼 XXXX',
+      text: [
+        '歡迎加入市集預購！',
+        '點下方「本週市集」就能用 LINE 身分直接進入，不用另外註冊。',
+        '選好商品與取貨時間後，到現場出示取貨碼付款取貨。',
+        '',
+        '攤商請點「我是攤商」輸入邀請碼，或直接在這裡輸入：邀請碼 XXXX',
+      ].join('\n'),
       quickReply: {
         items: [
           {
             type: 'action',
-            action: { type: 'uri', label: '本週市集', uri: webUrl('/') },
+            action: { type: 'uri', label: '本週市集', uri: appLink('/') },
           },
           {
             type: 'action',
-            action: { type: 'uri', label: '我的訂單', uri: webUrl('/orders') },
+            action: { type: 'uri', label: '我的訂單', uri: appLink('/orders') },
+          },
+          {
+            type: 'action',
+            action: { type: 'uri', label: '我是攤商', uri: appLink('/stall/redeem') },
           },
         ],
       },
@@ -46,7 +79,7 @@ export function inviteRedeemedMessage(params: {
         items: [
           {
             type: 'action',
-            action: { type: 'uri', label: '進入攤商專區', uri: webUrl('/stall') },
+            action: { type: 'uri', label: '進入攤商專區', uri: appLink('/stall') },
           },
         ],
       },
@@ -71,7 +104,7 @@ export function openStallMessage(): LineMessage[] {
         items: [
           {
             type: 'action',
-            action: { type: 'uri', label: '開啟攤商專區', uri: webUrl('/stall') },
+            action: { type: 'uri', label: '開啟攤商專區', uri: appLink('/stall') },
           },
         ],
       },
@@ -100,7 +133,7 @@ export function newOrderMessage(params: {
             action: {
               type: 'uri',
               label: '看訂單',
-              uri: webUrl(`/stall/${params.stallId}/days/${params.marketDayId}/orders`),
+              uri: appLink(`/stall/${params.stallId}/days/${params.marketDayId}/orders`),
             },
           },
         ],
@@ -128,7 +161,7 @@ export function pickupReminderMessage(params: {
             action: {
               type: 'uri',
               label: '查看訂單',
-              uri: webUrl(`/orders/${params.preorderId}`),
+              uri: appLink(`/orders/${params.preorderId}`),
             },
           },
         ],
@@ -145,9 +178,7 @@ export function broadcastMessage(params: {
 }): LineMessage[] {
   const messages: LineMessage[] = []
   if (params.imageUrl) {
-    const url = params.imageUrl.startsWith('http')
-      ? params.imageUrl
-      : `${config.WEB_URL}${params.imageUrl}`
+    const url = params.imageUrl.startsWith('http') ? params.imageUrl : webUrl(params.imageUrl)
     messages.push({ type: 'image', originalContentUrl: url, previewImageUrl: url })
   }
   const text = params.title ? `${params.title}\n\n${params.bodyText}` : params.bodyText

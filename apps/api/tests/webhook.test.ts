@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import request from 'supertest'
 import { prisma } from '../src/lib/db.js'
 import { config } from '../src/config.js'
+import { buildAppLink } from '../src/lib/line/messages.js'
 import {
   closeTestApp,
   createMarket,
@@ -251,5 +252,57 @@ describe('postback 與 unfollow（04 §D）', () => {
     ])
 
     expect(await prisma.appUser.findUnique({ where: { id: user.id } })).not.toBeNull()
+  })
+})
+
+describe('0916 入口流程：歡迎訊息的連結', () => {
+  it('buildAppLink：有 LIFF_ID 時是 LIFF 網址，沒有就是 WEB_URL', () => {
+    const withLiff = { liffId: '1234-abcd', webUrl: 'https://x.test' }
+    const noLiff = { liffId: '', webUrl: 'https://x.test' }
+    expect(buildAppLink('/', withLiff)).toBe('https://liff.line.me/1234-abcd/')
+    expect(buildAppLink('/stall/redeem', withLiff)).toBe(
+      'https://liff.line.me/1234-abcd/stall/redeem',
+    )
+    expect(buildAppLink('/orders', noLiff)).toBe('https://x.test/orders')
+    expect(buildAppLink('orders', noLiff)).toBe('https://x.test/orders')
+  })
+
+  it('有設 LIFF_ID 時，follow 的歡迎訊息三個按鈕都是 LIFF 網址，含「我是攤商」', async () => {
+    const line = installMockLine({ profile: { displayName: '新朋友' } })
+    const original = config.LIFF_ID
+    Object.assign(config, { LIFF_ID: 'test-liff-id' })
+    try {
+      await postWebhook([
+        { type: 'follow', replyToken: 'r-liff', source: { type: 'user', userId: 'Uliff1' } },
+      ])
+    } finally {
+      Object.assign(config, { LIFF_ID: original })
+    }
+
+    const [message] = line.calls.reply[0].messages
+    const items = (
+      message as { quickReply: { items: { action: { label: string; uri: string } }[] } }
+    ).quickReply.items
+    expect(items.map((i) => i.action.label)).toEqual(['本週市集', '我的訂單', '我是攤商'])
+    for (const item of items) {
+      expect(item.action.uri).toMatch(/^https:\/\/liff\.line\.me\/test-liff-id\//)
+    }
+    expect(items[2].action.uri).toBe('https://liff.line.me/test-liff-id/stall/redeem')
+  })
+
+  it('沒設 LIFF_ID 時退回 WEB_URL', async () => {
+    const line = installMockLine()
+    const original = config.LIFF_ID
+    Object.assign(config, { LIFF_ID: '' })
+    try {
+      await postWebhook([
+        { type: 'follow', replyToken: 'r-web', source: { type: 'user', userId: 'Uweb1' } },
+      ])
+    } finally {
+      Object.assign(config, { LIFF_ID: original })
+    }
+    const text = JSON.stringify(line.calls.reply[0].messages)
+    expect(text).toContain(`${config.WEB_URL}/stall/redeem`)
+    expect(text).not.toContain('liff.line.me')
   })
 })

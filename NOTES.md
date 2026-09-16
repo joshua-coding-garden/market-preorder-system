@@ -104,7 +104,38 @@ LINE Login 的 Callback URL 必須是外部連得到的 HTTPS 網址，`localhos
    dev server 佔住 Prisma query engine DLL，`prisma generate` 會 EPERM。
    非 Windows 環境沒有這個問題。
 
-### Non-goals 確認（00 §C）
+### 追加：LINE 入口流程
+
+需求：「line: 使用者流程 → linebot 加入 → 點擊（註冊？網址放在歡迎訊息中）」。
+目標是使用者加官方帳號好友後，點歡迎訊息的按鈕就完成註冊並進到網頁，不用再按登入。
+
+### 做了什麼
+
+- **`lib/line/messages.ts`**：新增 `buildAppLink()`／`appLink()`。有設 `LIFF_ID` 時所有按鈕連結
+  都是 `https://liff.line.me/{LIFF_ID}/路徑`，沒設就退回 `WEB_URL`。圖片網址仍用 `WEB_URL`（LINE 要求公開 HTTPS）。
+- **歡迎訊息改版**：說明「點按鈕即以 LINE 身分進入」，按鈕三個：本週市集、我的訂單、我是攤商（`/stall/redeem`）。
+- **`scripts/richmenu.ts`**：圖文選單連結同樣改用 `appLink()`。
+- **前端 `lib/liff.ts` + `store/session.tsx`**：啟動時 `liff.init()`（還原 `liff.state` 路徑）與 `/me` 同時進行；
+  未登入且在 LINE 內時，用 LIFF 的 ID token 打既有的 `POST /auth/line/liff` 換 session。
+  ID token 過期（401）時讓 LIFF 重新授權一次，`sessionStorage` 防止無限迴圈。
+  權限仍以伺服器 `/me` 為準，前端不用 LIFF profile 做任何判斷（04 §D）。
+- **新相依套件 `@line/liff`**（官方 SDK，前端）。
+
+### 驗收
+
+| 項目 | 結果 |
+|---|---|
+| `buildAppLink` 有／無 LIFF_ID、路徑正規化 | `[auto]` |
+| follow 事件：有 LIFF_ID 時三個按鈕都是 LIFF 網址、含「我是攤商」 | `[auto]` |
+| follow 事件：沒 LIFF_ID 時退回 WEB_URL | `[auto]` |
+| 真機：加好友 → 點「本週市集」→ 不按登入直接看到場次、`/me` 有身分 | 待委託方（需 LINE 憑證與 LIFF app） |
+| 真機：點「我是攤商」→ 直接進邀請碼頁 | 待委託方 |
+
+設定步驟見 README「LINE Developers Console 設定」與「LINE 入口流程（0916）」。
+
+---
+
+## Non-goals 確認（00 §C）
 
 本 Sprint 未觸及、且全期都不做：線上金流／退款／發票、簡訊 OTP、攤商自助註冊、
 顧客自行取消訂單、庫存進銷存、多語系、原生 App、Email 通知、多層巢狀內容物。
