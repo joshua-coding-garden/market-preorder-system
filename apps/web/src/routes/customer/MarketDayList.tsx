@@ -10,6 +10,7 @@ import {
   deadlineCountdown,
   formatTaipeiDate,
 } from '@/components/common'
+import HowItWorks from '@/components/HowItWorks'
 import { errorMessage } from '@/i18n/zh-TW'
 
 /** C1 場次列表：最近的已發布場次 */
@@ -36,6 +37,9 @@ export default function MarketDayList() {
   return (
     <>
       <PageHeader title="本週市集" subtitle="選擇場次開始預購" />
+
+      {/* 委託方 2026-09-20：首頁要有使用說明 */}
+      <HowItWorks />
 
       {days.length === 0 ? (
         <EmptyState title="目前沒有開放預購的場次" hint="市集開放後會在這裡顯示" />

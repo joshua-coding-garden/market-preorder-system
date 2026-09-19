@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '@/api/client'
 import { toMessage, useApi } from '@/api/useApi'
 import { EmptyState, ErrorState, PageHeader, Spinner } from '@/components/common'
@@ -148,6 +149,23 @@ export default function Stalls() {
                 >
                   {s.isActive ? '啟用中' : '已停用'}
                 </button>
+              </div>
+
+              {/* ⚠️ 規格外（2026-09-20 指示）：管理員直接進攤商的商品／上架頁。
+                  後端本來就允許 operator 代操作，這裡只是補上入口，不另做一套畫面。 */}
+              <div className="mt-3 flex flex-wrap gap-2 text-sm">
+                <Link
+                  to={`/stall/${s.id}/products`}
+                  className="rounded-lg border border-neutral-300 px-2.5 py-1.5"
+                >
+                  商品
+                </Link>
+                <Link
+                  to={`/stall/${s.id}/profile`}
+                  className="rounded-lg border border-neutral-300 px-2.5 py-1.5"
+                >
+                  基本資料
+                </Link>
               </div>
             </li>
           ))}

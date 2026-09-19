@@ -21,6 +21,17 @@ export async function resetDb(): Promise<void> {
       notification, broadcast, app_user
     RESTART IDENTITY CASCADE
   `)
+  // system_setting 是單列設定，不能 truncate（會連預設那列一起沒了），改成還原預設值
+  await prisma.systemSetting.upsert({
+    where: { id: 1 },
+    create: { id: 1 },
+    update: {
+      listingApprovalRequired: false,
+      maxProductsPerStall: 10,
+      maxStalls: 200,
+      updatedByUserId: null,
+    },
+  })
 }
 
 let app: FastifyInstance | null = null
@@ -162,5 +173,17 @@ export async function createListing(opts: {
       maxQty: opts.maxQty ?? null,
       status: opts.status ?? 'ON_SALE',
     },
+  })
+}
+
+/**
+ * ⚠️ 規格外（2026-09-20）：下單後子單是 PENDING_CONFIRM（店家確認中）。
+ * 不是在測確認流程本身的測試，用這個直接推進到「已成立」，
+ * 免得每個測試都要多打一次確認 API。
+ */
+export async function confirmAllSubOrders(marketDayId?: string): Promise<void> {
+  await prisma.subOrder.updateMany({
+    where: { status: 'PENDING_CONFIRM', ...(marketDayId ? { marketDayId } : {}) },
+    data: { status: 'PENDING', confirmedAt: new Date() },
   })
 }

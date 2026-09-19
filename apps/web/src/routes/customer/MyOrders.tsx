@@ -20,6 +20,11 @@ function summarize(statuses: string[]): { status: string; label: string } {
   if (unique.length === 1) {
     return { status: unique[0], label: subOrderStatusLabel[unique[0]] }
   }
+  // ⚠️ 規格外（2026-09-20）：只要還有攤沒確認，先講「確認中」——那是顧客最需要知道的
+  const confirming = statuses.filter((s) => s === 'PENDING_CONFIRM').length
+  if (confirming > 0) {
+    return { status: 'PENDING_CONFIRM', label: `${confirming} 攤店家確認中` }
+  }
   const pending = statuses.filter((s) => s === 'PENDING').length
   return pending > 0
     ? { status: 'PENDING', label: `${pending} 攤待取貨` }

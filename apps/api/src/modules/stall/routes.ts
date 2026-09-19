@@ -4,6 +4,8 @@
 //   /operator/participations/*   requireAuth → assertOperator
 //   POST /stall/invite-codes/redeem           requireAuth（任何登入者都能兌換）
 //   GET  /stalls/:stallId/market-days         requireAuth → assertStallMember
+//   GET/PATCH /stalls/:stallId                requireAuth → assertStallMember（⚠️ 規格外）
+//   POST /stalls/:stallId/sub-orders/:id/confirm  同上（⚠️ 規格外）
 import type { FastifyPluginAsync } from 'fastify'
 import {
   createParticipationSchema,
@@ -17,6 +19,7 @@ import {
   subOrderListQuerySchema,
   updateParticipationSchema,
   updateStallSchema,
+  updateStallSelfSchema,
   updateSubOrderStatusSchema,
   uuidSchema,
 } from '@market/shared'
@@ -32,10 +35,12 @@ import {
   operatorPrepSheet,
   prepSheet,
   setSubOrderStatus,
+  confirmSubOrder,
 } from './orderService.js'
 import {
   createParticipation,
   createStall,
+  getStallProfile,
   deleteParticipation,
   listParticipations,
   listStallMarketDays,
@@ -44,6 +49,7 @@ import {
   reissueInviteCode,
   updateParticipation,
   updateStall,
+  updateStallProfile,
 } from './service.js'
 
 const operatorSubOrderQuerySchema = subOrderListQuerySchema.extend({
@@ -171,11 +177,34 @@ const stallRoutes: FastifyPluginAsync = async (app) => {
     return lookupPickupCode(stallId, dayId, code)
   })
 
+  // ⚠️ 規格外（2026-09-20 指示）：攤商自己看／改基本資料
+  app.get('/stalls/:stallId', async (req) => {
+    const userId = requireAuth(req)
+    const { stallId } = stallIdParamSchema.parse(req.params)
+    await assertStallMember(userId, stallId)
+    return getStallProfile(stallId)
+  })
+
+  app.patch('/stalls/:stallId', async (req) => {
+    const userId = requireAuth(req)
+    const { stallId } = stallIdParamSchema.parse(req.params)
+    await assertStallMember(userId, stallId)
+    return updateStallProfile(stallId, updateStallSelfSchema.parse(req.body))
+  })
+
   app.post('/stalls/:stallId/sub-orders/:id/pickup', async (req) => {
     const userId = requireAuth(req)
     const { stallId, id } = stallResourceParamSchema.parse(req.params)
     await assertStallMember(userId, stallId)
     return markPickedUp(stallId, id, userId)
+  })
+
+  // ⚠️ 規格外（2026-09-20 指示）：店家確認接單
+  app.post('/stalls/:stallId/sub-orders/:id/confirm', async (req) => {
+    const userId = requireAuth(req)
+    const { stallId, id } = stallResourceParamSchema.parse(req.params)
+    await assertStallMember(userId, stallId)
+    return confirmSubOrder(stallId, id, userId)
   })
 
   app.patch('/stalls/:stallId/sub-orders/:id/status', async (req) => {

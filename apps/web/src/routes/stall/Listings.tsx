@@ -19,6 +19,9 @@ interface ListingRow {
   price: number
   maxQty: number | null
   status: ListingStatus
+  /** ⚠️ 規格外（2026-09-20）：上架審核 */
+  approval?: 'APPROVED' | 'PENDING_REVIEW' | 'REJECTED'
+  rejectReason?: string | null
 }
 
 interface StallDay {
@@ -169,6 +172,20 @@ export default function Listings() {
                     <p className="font-mono text-xs text-neutral-500">
                       {p.code}・基本價 <MoneyTWD value={p.basePrice} />
                     </p>
+                    {/* ⚠️ 規格外（2026-09-20）：審核開著時，攤商要看得到自己卡在哪 */}
+                    {(() => {
+                      const l = listings.data?.items.find((x) => x.productId === p.id)
+                      if (!l?.approval || l.approval === 'APPROVED') return null
+                      return l.approval === 'PENDING_REVIEW' ? (
+                        <p className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+                          待主辦單位審核，顧客還看不到
+                        </p>
+                      ) : (
+                        <p className="mt-1 rounded-lg bg-red-50 px-2 py-1 text-[11px] leading-relaxed text-red-700">
+                          已被退回：{l.rejectReason ?? '未附理由'}（修改後儲存會重新送審）
+                        </p>
+                      )
+                    })()}
                   </div>
                 </label>
 

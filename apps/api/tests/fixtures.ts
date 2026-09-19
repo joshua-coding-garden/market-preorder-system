@@ -99,13 +99,20 @@ export async function setupTwoStalls() {
   }
 }
 
-/** 幫某個顧客下一筆單，回傳建立的訂單 body */
+/**
+ * 幫某個顧客下一筆單，回傳建立的訂單 body。
+ *
+ * ⚠️ 規格外（2026-09-20）：下單後子單是 PENDING_CONFIRM（店家確認中）。
+ * 絕大多數測試關心的是「訂單成立之後」的行為，所以這裡預設幫忙推進到 PENDING；
+ * 要驗確認流程本身的測試請傳 `{ confirm: false }`。
+ */
 export async function placeOrder(
   app: FastifyInstance,
   cookie: string,
   dayId: string,
   items: { listingId: string; qty: number; componentIds?: string[]; note?: string }[],
   overrides: Record<string, unknown> = {},
+  opts: { confirm?: boolean } = {},
 ) {
   for (const item of items) {
     const res = await request(app.server)
@@ -133,6 +140,14 @@ export async function placeOrder(
       ...overrides,
     })
   if (res.status !== 201) throw new Error(`下單失敗：${JSON.stringify(res.body)}`)
+
+  if (opts.confirm !== false) {
+    await prisma.subOrder.updateMany({
+      where: { preorderId: res.body.id, status: 'PENDING_CONFIRM' },
+      data: { status: 'PENDING', confirmedAt: new Date() },
+    })
+  }
+
   return res.body as {
     id: string
     subOrders: { id: string; stall: { id: string; name: string }; pickupCode: string }[]

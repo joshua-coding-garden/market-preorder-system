@@ -88,8 +88,10 @@ export default function ImageUploader({
           >
             {uploading ? '上傳中…' : current ? '更換圖片' : '選擇圖片'}
           </button>
-          <p className="mt-1.5 text-xs text-neutral-500">
-            JPG／PNG／WebP，8MB 以內。上傳後會自動壓縮。
+          {/* 委託方 2026-09-20：照片規範要寫清楚 */}
+          <p className="mt-1.5 text-xs leading-relaxed text-neutral-500">
+            每項商品 1 張。接受 JPG／PNG／WebP，單檔 8MB 以內。
+            手機可直接從相簿選或現拍；上傳後會自動轉正、壓成 WebP。
           </p>
           {savedSize ? <p className="mt-1 text-xs text-green-700">{savedSize}</p> : null}
           {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}

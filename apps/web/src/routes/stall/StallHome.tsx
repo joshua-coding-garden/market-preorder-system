@@ -148,12 +148,13 @@ export default function StallHome() {
         </ul>
       ) : null}
 
-      <div className="px-4 pb-8">
-        <Link
-          to={`/stall/${stallId}/products`}
-          className="btn-secondary w-full"
-        >
+      <div className="flex gap-2 px-4 pb-8">
+        <Link to={`/stall/${stallId}/products`} className="btn-secondary flex-1">
           商品管理
+        </Link>
+        {/* 委託方 2026-09-20：攤商要能自己看／改基本資料 */}
+        <Link to={`/stall/${stallId}/profile`} className="btn-secondary flex-1">
+          基本資料
         </Link>
       </div>
     </>

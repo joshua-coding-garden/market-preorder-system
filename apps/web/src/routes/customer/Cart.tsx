@@ -54,8 +54,18 @@ export default function Cart() {
             {data.stalls.map((group) => (
               <section key={group.stall.id} className="card overflow-hidden">
                 <header className="flex items-baseline justify-between border-b border-neutral-200 px-4 py-2.5">
-                  <h2 className="text-base font-semibold">{group.stall.name}</h2>
-                  <span className="text-xs text-neutral-500">攤位 {group.stall.boothNo}</span>
+                  <h2 className="min-w-0 truncate text-base font-semibold">
+                    {group.stall.name}
+                    <span className="ml-2 text-xs font-normal text-neutral-500">
+                      攤位 {group.stall.boothNo}
+                    </span>
+                  </h2>
+                  <Link
+                    to={`/days/${dayId}/stalls/${group.stall.id}`}
+                    className="shrink-0 text-xs font-medium text-brand-600"
+                  >
+                    繼續逛這攤 ›
+                  </Link>
                 </header>
 
                 <ul className="divide-y divide-neutral-100">
@@ -172,14 +182,24 @@ export default function Cart() {
                 <MoneyTWD value={data.total} />
               </span>
             </div>
-            <button
-              type="button"
-              className="btn-primary w-full"
-              disabled={data.hasUnavailable || data.total === 0}
-              onClick={() => navigate(`/days/${dayId}/checkout`)}
-            >
-              前往結帳
-            </button>
+            <div className="flex gap-2">
+              {/* 委託方 2026-09-20：原本沒有回頭繼續挑商品的入口 */}
+              <button
+                type="button"
+                className="btn-secondary shrink-0 px-4"
+                onClick={() => navigate(`/days/${dayId}`)}
+              >
+                繼續購物
+              </button>
+              <button
+                type="button"
+                className="btn-primary flex-1"
+                disabled={data.hasUnavailable || data.total === 0}
+                onClick={() => navigate(`/days/${dayId}/checkout`)}
+              >
+                前往訂購
+              </button>
+            </div>
           </div>
         </>
       )}

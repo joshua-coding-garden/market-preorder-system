@@ -44,6 +44,8 @@ export default function SubOrderDetail() {
   if (!data) return null
 
   const isPending = data.status === 'PENDING'
+  // ⚠️ 規格外（2026-09-20）：還沒接單的只給「確認接單／婉拒」兩個動作
+  const needsConfirm = data.status === 'PENDING_CONFIRM'
 
   return (
     <>
@@ -138,6 +140,44 @@ export default function SubOrderDetail() {
 
       <div className="px-4 pb-8">
         <FormError message={actionError} />
+        {needsConfirm ? (
+          <div className="mt-2 space-y-2">
+            <p className="rounded-xl bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-800">
+              這筆還沒確認。按下「確認接單」之後訂單才算成立，也才會進備貨總表、才核銷得了。
+            </p>
+            <button
+              type="button"
+              className="btn-primary w-full"
+              style={{ minHeight: 56 }}
+              disabled={busy}
+              onClick={() =>
+                run(
+                  () => api.post(`/stalls/${stallId}/sub-orders/${id}/confirm`),
+                  '已確認接單，訂單成立',
+                )
+              }
+            >
+              確認接單
+            </button>
+            <button
+              type="button"
+              className="btn-secondary w-full text-red-600"
+              disabled={busy}
+              onClick={() =>
+                run(
+                  () =>
+                    api.patch(`/stalls/${stallId}/sub-orders/${id}/status`, {
+                      status: 'CANCELLED',
+                    }),
+                  '已婉拒這筆訂單',
+                )
+              }
+            >
+              婉拒這筆訂單
+            </button>
+          </div>
+        ) : null}
+
         {isPending ? (
           <div className="mt-2 space-y-2">
             <button
@@ -189,11 +229,13 @@ export default function SubOrderDetail() {
               </button>
             </div>
           </div>
-        ) : (
+        ) : null}
+
+        {!isPending && !needsConfirm ? (
           <p className="mt-2 rounded-xl bg-neutral-100 px-3 py-2.5 text-sm text-neutral-600">
             這筆訂單已是終態，不能再變更。若標錯了請聯繫主辦單位。
           </p>
-        )}
+        ) : null}
       </div>
 
       <Toast message={toast} />

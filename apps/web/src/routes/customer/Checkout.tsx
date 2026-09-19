@@ -105,7 +105,7 @@ export default function Checkout() {
   if (cart.data.stalls.length === 0) {
     return (
       <>
-        <PageHeader title="結帳" />
+        <PageHeader title="訂購" />
         <p className="px-4 text-sm text-neutral-600">購物車是空的，請先挑選商品。</p>
       </>
     )
@@ -114,7 +114,7 @@ export default function Checkout() {
   return (
     <>
       <PageHeader
-        title="結帳"
+        title="訂購"
         subtitle={`${formatTaipeiDate(day.data.eventDate)}・${day.data.market.name}`}
       />
 
@@ -242,8 +242,10 @@ export default function Checkout() {
         <button type="submit" className="btn-primary w-full" disabled={submitting}>
           {submitting ? '送出中…' : '送出預購'}
         </button>
-        <p className="text-center text-xs text-neutral-400">
-          送出後會為每個攤位產生一組取貨碼，現場出示付款取貨。本系統不收線上付款。
+        {/* 委託方 2026-09-20：送出不等於訂單成立，要先講清楚 */}
+        <p className="text-center text-xs leading-relaxed text-neutral-400">
+          送出後會通知各攤商，<strong className="text-neutral-500">店家確認接單後訂單才算成立</strong>
+          ，並為每個攤位產生一組取貨碼。現場出示付款取貨，本系統不收線上付款。
         </p>
       </form>
     </>

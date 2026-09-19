@@ -7,9 +7,12 @@ const NAV = [
   { to: '/operator', label: '儀表板', end: true },
   { to: '/operator/days', label: '場次' },
   { to: '/operator/stalls', label: '攤商' },
+  // ⚠️ 規格外（2026-09-20 指示）
+  { to: '/operator/listings', label: '商品審核' },
   { to: '/operator/markets', label: '市集' },
   { to: '/operator/broadcasts', label: '推播' },
   { to: '/operator/permissions', label: '帳號與權限' },
+  { to: '/operator/settings', label: '系統設定' },
 ]
 
 /** 廠商 CMS 外框（05 §廠商 View） */

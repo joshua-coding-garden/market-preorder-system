@@ -2,7 +2,23 @@
 
 export const MarketDayStatus = ['DRAFT', 'PUBLISHED', 'CLOSED'] as const
 export const ListingStatus = ['ON_SALE', 'SOLD_OUT', 'OFF_SHELF'] as const
-export const SubOrderStatus = ['PENDING', 'PICKED_UP', 'NO_SHOW', 'CANCELLED'] as const
+/**
+ * ⚠️ 規格外（委託方 2026-09-20 指示）：上架審核。
+ * 審核關閉時一律 APPROVED；開啟時攤商新上架的商品進 PENDING_REVIEW，
+ * 管理員通過才會出現在顧客端。
+ */
+export const ListingApproval = ['APPROVED', 'PENDING_REVIEW', 'REJECTED'] as const
+/**
+ * ⚠️ 偏離 02 §C（委託方 2026-09-20 指示）：
+ * 下單後先進 PENDING_CONFIRM（店家確認中），店家確認了才是 PENDING（訂單成立）。
+ */
+export const SubOrderStatus = [
+  'PENDING_CONFIRM',
+  'PENDING',
+  'PICKED_UP',
+  'NO_SHOW',
+  'CANCELLED',
+] as const
 export const InviteStatus = ['ACTIVE', 'REDEEMED', 'EXPIRED', 'RECYCLED'] as const
 export const ComposeMode = ['OPERATOR_COMPOSE', 'STALL_COMPOSE'] as const
 export const Audience = ['ALL_FRIENDS', 'MARKET_DAY_CUSTOMERS', 'STALL_CUSTOMERS'] as const
@@ -24,11 +40,19 @@ export const UserRole = ['user', 'operator'] as const
  */
 export const PICKUP_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
 export const PICKUP_CODE_LENGTH = 4
+/**
+ * ⚠️ 規格外的容量上限（委託方 2026-09-20 指示）。
+ * 實際生效的值存在 system_setting，這裡只是初始預設。
+ */
+export const DEFAULT_MAX_PRODUCTS_PER_STALL = 10
+export const DEFAULT_MAX_STALLS = 200
+
 /** 取貨碼流水號位數 */
 export const PICKUP_SERIAL_DIGITS = 3
 
 export type MarketDayStatus = (typeof MarketDayStatus)[number]
 export type ListingStatus = (typeof ListingStatus)[number]
+export type ListingApproval = (typeof ListingApproval)[number]
 export type SubOrderStatus = (typeof SubOrderStatus)[number]
 export type InviteStatus = (typeof InviteStatus)[number]
 export type ComposeMode = (typeof ComposeMode)[number]

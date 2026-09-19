@@ -5,6 +5,7 @@ import type {
   MarketDayListItem,
   Paged,
   UpdateMarketDayInput,
+  UpdateMarketInput,
 } from '@market/shared'
 import type { Market, MarketDay, Prisma } from '@prisma/client'
 import { prisma } from '../../lib/db.js'
@@ -80,7 +81,12 @@ export async function listPublishedMarketDays(params: {
   const from = params.from ?? todayInTaipei()
 
   const days = await prisma.marketDay.findMany({
-    where: { status: 'PUBLISHED', eventDate: { gte: isoDateToDate(from) } },
+    // ⚠️ 規格外（2026-09-20）：停用的市集連同它的場次一起從顧客端消失
+    where: {
+      status: 'PUBLISHED',
+      eventDate: { gte: isoDateToDate(from) },
+      market: { isActive: true },
+    },
     include: { market: true, _count: { select: { participations: true } } },
     orderBy: [{ eventDate: 'asc' }, { id: 'asc' }],
     take: limit + 1,
@@ -116,6 +122,8 @@ export async function getMarketDayDetail(
 
   if (!day) throw notFound('找不到場次')
   if (day.status === 'DRAFT' && !viewerIsOperator) throw notFound('找不到場次')
+  // ⚠️ 規格外（2026-09-20）：市集停用後顧客也不該再看到詳情
+  if (!day.market.isActive && !viewerIsOperator) throw notFound('找不到場次')
 
   return {
     ...toListItem(day, day.participations.length),
@@ -140,6 +148,7 @@ export async function listMarkets() {
     name: m.name,
     location: m.location,
     description: m.description,
+    isActive: m.isActive,
     marketDayCount: m._count.marketDays,
     createdAt: m.createdAt.toISOString(),
   }))
@@ -154,6 +163,7 @@ export async function createMarket(input: CreateMarketInput) {
       name: market.name,
       location: market.location,
       description: market.description,
+      isActive: market.isActive,
       marketDayCount: 0,
       createdAt: market.createdAt.toISOString(),
     }
@@ -162,6 +172,36 @@ export async function createMarket(input: CreateMarketInput) {
       throw new AppError('CONFLICT', `市集代號 ${input.code} 已存在`)
     }
     throw err
+  }
+}
+
+/**
+ * ⚠️ 規格外（委託方 2026-09-20 指示）：PATCH /operator/markets/:id。
+ * 停用不會動到既有場次的資料，只是讓顧客端看不到，隨時可以恢復。
+ */
+export async function updateMarket(id: string, input: UpdateMarketInput) {
+  const existing = await prisma.market.findUnique({ where: { id } })
+  if (!existing) throw notFound('找不到市集')
+
+  const market = await prisma.market.update({
+    where: { id },
+    data: {
+      ...(input.name === undefined ? {} : { name: input.name }),
+      ...(input.location === undefined ? {} : { location: input.location }),
+      ...(input.description === undefined ? {} : { description: input.description }),
+      ...(input.isActive === undefined ? {} : { isActive: input.isActive }),
+    },
+    include: { _count: { select: { marketDays: true } } },
+  })
+  return {
+    id: market.id,
+    code: market.code,
+    name: market.name,
+    location: market.location,
+    description: market.description,
+    isActive: market.isActive,
+    marketDayCount: market._count.marketDays,
+    createdAt: market.createdAt.toISOString(),
   }
 }
 
@@ -191,6 +231,10 @@ export async function listOperatorMarketDays(params: {
 export async function createMarketDay(input: CreateMarketDayInput) {
   const market = await prisma.market.findUnique({ where: { id: input.marketId } })
   if (!market) throw notFound('找不到市集')
+  // ⚠️ 規格外（2026-09-20）：停用的市集不能再開新場次
+  if (!market.isActive) {
+    throw new AppError('CONFLICT', '這個市集已停用，請先恢復才能新增場次')
+  }
 
   try {
     const day = await prisma.marketDay.create({
@@ -294,6 +338,12 @@ export async function closeMarketDay(id: string): Promise<{ noShowCount: number 
   }
 
   return prisma.$transaction(async (tx) => {
+    // ⚠️ 規格外（2026-09-20）：店家始終沒確認的訂單不算成立，關場時當作取消，
+    // 不要記成「沒來取貨」——那是顧客的鍋，這裡明明是店家沒回應。
+    await tx.subOrder.updateMany({
+      where: { marketDayId: id, status: 'PENDING_CONFIRM' },
+      data: { status: 'CANCELLED' },
+    })
     const noShow = await tx.subOrder.updateMany({
       where: { marketDayId: id, status: 'PENDING' },
       data: { status: 'NO_SHOW' },

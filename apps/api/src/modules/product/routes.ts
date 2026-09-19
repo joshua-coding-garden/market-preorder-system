@@ -17,6 +17,7 @@ import {
 } from '@market/shared'
 import { AppError } from '../../lib/errors.js'
 import { MAX_IMAGE_BYTES, assertAcceptableImage } from '../../lib/image.js'
+import { getSettings } from '../../lib/settings.js'
 import { assertStallMember, requireAuth } from '../../plugins/authz.js'
 import {
   copyListingsFrom,
@@ -49,7 +50,13 @@ const productRoutes: FastifyPluginAsync = async (app) => {
     const { stallId } = stallIdParamSchema.parse(req.params)
     await assertStallMember(userId, stallId)
     const { includeInactive } = productListQuerySchema.parse(req.query)
-    return { items: await listProducts(stallId, includeInactive ?? false) }
+    // ⚠️ 規格外（2026-09-20）：一併回品項上限，攤商頁才顯示得出「已用 3／10」
+    const [items, { maxProductsPerStall }] = await Promise.all([
+      listProducts(stallId, includeInactive ?? false),
+      getSettings(),
+    ])
+    const used = items.filter((p) => p.isActive).length
+    return { items, limit: { used, max: maxProductsPerStall } }
   })
 
   app.post('/stalls/:stallId/products', async (req, reply) => {

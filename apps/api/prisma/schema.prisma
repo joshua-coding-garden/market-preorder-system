@@ -29,7 +29,16 @@ enum ListingStatus {
   OFF_SHELF
 }
 
+/// ⚠️ 規格外（2026-09-20 指示）：上架審核
+enum ListingApproval {
+  APPROVED
+  PENDING_REVIEW
+  REJECTED
+}
+
 enum SubOrderStatus {
+  /// ⚠️ 規格外（2026-09-20 指示）：店家確認中
+  PENDING_CONFIRM
   PENDING
   PICKED_UP
   NO_SHOW
@@ -92,10 +101,12 @@ model AppUser {
   stallMemberships    StallMember[]
   carts               Cart[]
   preorders           Preorder[]
-  redeemedInviteCodes InviteCode[]   @relation("InviteRedeemedBy")
-  pickedUpSubOrders   SubOrder[]     @relation("SubOrderPickedUpBy")
-  requestedBroadcasts Broadcast[]    @relation("BroadcastRequestedBy")
-  reviewedBroadcasts  Broadcast[]    @relation("BroadcastReviewedBy")
+  redeemedInviteCodes InviteCode[]     @relation("InviteRedeemedBy")
+  pickedUpSubOrders   SubOrder[]       @relation("SubOrderPickedUpBy")
+  confirmedSubOrders  SubOrder[]       @relation("SubOrderConfirmedBy")
+  reviewedListings    Listing[]        @relation("ListingReviewedBy")
+  requestedBroadcasts Broadcast[]      @relation("BroadcastRequestedBy")
+  reviewedBroadcasts  Broadcast[]      @relation("BroadcastReviewedBy")
   notifications       Notification[]
 
   @@map("app_user")
@@ -123,6 +134,8 @@ model Market {
   name        String
   location    String
   description String?
+  /// ⚠️ 規格外（2026-09-20 指示）：停用的市集不能再開場次，顧客端也看不到
+  isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   marketDays MarketDay[]
@@ -285,8 +298,16 @@ model Listing {
   /// 預購上限；NULL 不限
   maxQty      Int?          @map("max_qty")
   status      ListingStatus @default(ON_SALE)
-  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  /// ⚠️ 規格外（2026-09-20 指示）：上架審核
+  approval         ListingApproval @default(APPROVED)
+  rejectReason     String?         @map("reject_reason")
+  reviewedAt       DateTime?       @map("reviewed_at") @db.Timestamptz(6)
+  reviewedByUserId String?         @map("reviewed_by_user_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  reviewedBy AppUser?    @relation("ListingReviewedBy", fields: [reviewedByUserId], references: [id])
   marketDay  MarketDay   @relation(fields: [marketDayId], references: [id], onDelete: Cascade)
   product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   stall      Stall       @relation(fields: [stallId], references: [id], onDelete: Cascade)
@@ -295,6 +316,7 @@ model Listing {
 
   @@unique([marketDayId, productId])
   @@index([marketDayId, stallId, status], map: "idx_listing_day_stall")
+  @@index([approval], map: "idx_listing_approval")
   @@map("listing")
 }
 
@@ -305,8 +327,8 @@ model Cart {
   marketDayId String   @map("market_day_id") @db.Uuid
   updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
 
-  user      AppUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  marketDay MarketDay @relation(fields: [marketDayId], references: [id], onDelete: Cascade)
+  user      AppUser    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketDay MarketDay  @relation(fields: [marketDayId], references: [id], onDelete: Cascade)
   items     CartItem[]
 
   @@unique([userId, marketDayId])
@@ -314,13 +336,13 @@ model Cart {
 }
 
 model CartItem {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  cartId    String   @map("cart_id") @db.Uuid
-  listingId String   @map("listing_id") @db.Uuid
-  qty       Int
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cartId     String   @map("cart_id") @db.Uuid
+  listingId  String   @map("listing_id") @db.Uuid
+  qty        Int
   /// ⚠️ 偏離 schema.sql：特製備註改為每個商品項目一個（委託方 2026-09-13 指示）
-  customNote String? @map("custom_note")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  customNote String?  @map("custom_note")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   cart       Cart                @relation(fields: [cartId], references: [id], onDelete: Cascade)
   listing    Listing             @relation(fields: [listingId], references: [id], onDelete: Cascade)
@@ -377,17 +399,21 @@ model SubOrder {
   boothNo     String @map("booth_no")
   pickupCode  String @map("pickup_code")
 
-  status           SubOrderStatus @default(PENDING)
-  subtotal         Int
-  pickedUpAt       DateTime?      @map("picked_up_at") @db.Timestamptz(6)
-  pickedUpByUserId String?        @map("picked_up_by_user_id") @db.Uuid
-  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  status            SubOrderStatus @default(PENDING)
+  subtotal          Int
+  /// ⚠️ 規格外（2026-09-20 指示）：店家按下確認的時間
+  confirmedAt       DateTime?      @map("confirmed_at") @db.Timestamptz(6)
+  confirmedByUserId String?        @map("confirmed_by_user_id") @db.Uuid
+  pickedUpAt        DateTime?      @map("picked_up_at") @db.Timestamptz(6)
+  pickedUpByUserId  String?        @map("picked_up_by_user_id") @db.Uuid
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  preorder   Preorder    @relation(fields: [preorderId], references: [id], onDelete: Cascade)
-  marketDay  MarketDay   @relation(fields: [marketDayId], references: [id], onDelete: Restrict)
-  stall      Stall       @relation(fields: [stallId], references: [id], onDelete: Restrict)
-  pickedUpBy AppUser?    @relation("SubOrderPickedUpBy", fields: [pickedUpByUserId], references: [id])
-  items      OrderItem[]
+  preorder    Preorder    @relation(fields: [preorderId], references: [id], onDelete: Cascade)
+  marketDay   MarketDay   @relation(fields: [marketDayId], references: [id], onDelete: Restrict)
+  stall       Stall       @relation(fields: [stallId], references: [id], onDelete: Restrict)
+  confirmedBy AppUser?    @relation("SubOrderConfirmedBy", fields: [confirmedByUserId], references: [id])
+  pickedUpBy  AppUser?    @relation("SubOrderPickedUpBy", fields: [pickedUpByUserId], references: [id])
+  items       OrderItem[]
 
   @@unique([preorderId, stallId])
   /// 取貨碼：同場次唯一 ＝「每日刷新」
@@ -488,4 +514,21 @@ model Notification {
   @@index([createdAt, status], map: "idx_notification_month")
   @@index([kind, refId], map: "idx_notification_ref")
   @@map("notification")
+}
+
+/// ⚠️ 規格外（委託方 2026-09-20 指示）：全站設定，永遠只有 id=1 這一列。
+model SystemSetting {
+  id Int @id @default(1)
+
+  /// 開啟後，攤商新上架的商品要管理員審核通過才會出現在顧客端
+  listingApprovalRequired Boolean @default(false) @map("listing_approval_required")
+  /// 每個攤商的上架品項上限
+  maxProductsPerStall     Int     @default(10) @map("max_products_per_stall")
+  /// 全站攤商數上限
+  maxStalls               Int     @default(200) @map("max_stalls")
+
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
+
+  @@map("system_setting")
 }

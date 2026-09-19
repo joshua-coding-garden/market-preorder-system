@@ -31,7 +31,8 @@ export interface OrderSubOrder {
   stall: { id: string; name: string }
   boothNo: string
   pickupCode: string
-  status: 'PENDING' | 'PICKED_UP' | 'NO_SHOW' | 'CANCELLED'
+  status: 'PENDING_CONFIRM' | 'PENDING' | 'PICKED_UP' | 'NO_SHOW' | 'CANCELLED'
+  confirmedAt?: string | null
   subtotal: number
   pickedUpAt: string | null
   items: {

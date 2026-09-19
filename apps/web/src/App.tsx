@@ -21,6 +21,8 @@ import OperatorBroadcastDetail from '@/routes/operator/BroadcastDetail'
 import OperatorBroadcasts from '@/routes/operator/Broadcasts'
 import OperatorDashboard from '@/routes/operator/Dashboard'
 import OperatorDayOrders from '@/routes/operator/DayOrders'
+import OperatorListings from '@/routes/operator/Listings'
+import OperatorSettings from '@/routes/operator/Settings'
 import OperatorStalls from '@/routes/operator/Stalls'
 import StallLayout from '@/routes/stall/Layout'
 import StallHome from '@/routes/stall/StallHome'
@@ -30,6 +32,7 @@ import StallBroadcasts from '@/routes/stall/Broadcasts'
 import StallPickup from '@/routes/stall/Pickup'
 import StallPrepSheet from '@/routes/stall/PrepSheet'
 import StallProducts from '@/routes/stall/Products'
+import StallProfilePage from '@/routes/stall/Profile'
 import StallSubOrderDetail from '@/routes/stall/SubOrderDetail'
 import StallSubOrders from '@/routes/stall/SubOrders'
 import Redeem from '@/routes/stall/Redeem'
@@ -71,6 +74,7 @@ export default function App() {
             }
           >
             <Route index element={<StallHome />} />
+            <Route path=":stallId/profile" element={<StallProfilePage />} />
             <Route path=":stallId/products" element={<StallProducts />} />
             <Route path=":stallId/products/:id" element={<StallProductEdit />} />
             <Route path=":stallId/days/:dayId/listings" element={<StallListings />} />
@@ -107,6 +111,8 @@ export default function App() {
             <Route path="days" element={<MarketDays />} />
             <Route path="days/:id" element={<MarketDayDetail />} />
             <Route path="stalls" element={<OperatorStalls />} />
+            <Route path="listings" element={<OperatorListings />} />
+            <Route path="settings" element={<OperatorSettings />} />
             <Route path="permissions" element={<Permissions />} />
             <Route path="days/:id/orders" element={<OperatorDayOrders />} />
             <Route path="broadcasts" element={<OperatorBroadcasts />} />

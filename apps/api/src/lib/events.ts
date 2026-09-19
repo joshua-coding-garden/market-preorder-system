@@ -21,7 +21,8 @@ export interface OrderStatusEvent {
   subOrderId: string
   stallId: string
   marketDayId: string
-  status: 'PENDING' | 'PICKED_UP' | 'NO_SHOW' | 'CANCELLED'
+  status: 'PENDING_CONFIRM' | 'PENDING' | 'PICKED_UP' | 'NO_SHOW' | 'CANCELLED'
+  confirmedAt?: string
   pickedUpAt?: string
 }
 

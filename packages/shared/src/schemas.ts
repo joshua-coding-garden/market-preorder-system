@@ -1,6 +1,6 @@
 // 前後端共用的 request schema（B-8）。依 Sprint 逐步補齊。
 import { z } from 'zod'
-import { ListingStatus, MarketDayStatus, SubOrderStatus } from './enums.js'
+import { ListingApproval, ListingStatus, MarketDayStatus, SubOrderStatus } from './enums.js'
 import {
   hhmmSchema,
   inviteCodeSchema,
@@ -137,6 +137,22 @@ export const updateStallSchema = createStallSchema.partial().extend({
 })
 export type UpdateStallInput = z.infer<typeof updateStallSchema>
 
+/**
+ * ⚠️ 規格外（2026-09-20 指示）：PATCH /stalls/:stallId —— 攤商自己維護基本資料。
+ * 刻意不含 isActive：停用／恢復是管理員的權限，攤商不能自己關掉自己。
+ */
+export const updateStallSelfSchema = createStallSchema.partial().strict()
+export type UpdateStallSelfInput = z.infer<typeof updateStallSelfSchema>
+
+/** ⚠️ 規格外（2026-09-20 指示）：PATCH /operator/markets/:id */
+export const updateMarketSchema = z.object({
+  name: z.string().trim().min(1).max(50).optional(),
+  location: z.string().trim().min(1).max(100).optional(),
+  description: z.string().trim().max(500).optional(),
+  isActive: z.boolean().optional(),
+})
+export type UpdateMarketInput = z.infer<typeof updateMarketSchema>
+
 /** POST /operator/market-days/:id/participations */
 export const createParticipationSchema = z.object({
   stallId: uuidSchema,
@@ -215,6 +231,39 @@ export type ReplaceListingsInput = z.infer<typeof replaceListingsSchema>
 
 export const copyListingsSchema = z.object({ sourceDayId: uuidSchema })
 export type CopyListingsInput = z.infer<typeof copyListingsSchema>
+
+/**
+ * ⚠️ 規格外（2026-09-20 指示）：管理員端的審核。
+ */
+export const operatorListingQuerySchema = z.object({
+  approval: z.enum(ListingApproval).optional(),
+  marketDayId: uuidSchema.optional(),
+  stallId: uuidSchema.optional(),
+})
+export type OperatorListingQuery = z.infer<typeof operatorListingQuerySchema>
+
+export const rejectListingSchema = z.object({
+  reason: z.string().trim().min(1, '請填寫退回原因').max(200),
+})
+export type RejectListingInput = z.infer<typeof rejectListingSchema>
+
+/** 管理員強制上／下架 */
+export const operatorUpdateListingSchema = z.object({
+  status: z.enum(ListingStatus).optional(),
+  price: moneySchema.optional(),
+  maxQty: z.number().int().min(1).nullable().optional(),
+})
+export type OperatorUpdateListingInput = z.infer<typeof operatorUpdateListingSchema>
+
+/** ⚠️ 規格外（2026-09-20 指示）：PATCH /operator/settings */
+export const updateSettingsSchema = z
+  .object({
+    listingApprovalRequired: z.boolean().optional(),
+    maxProductsPerStall: z.number().int().min(1).max(1000).optional(),
+    maxStalls: z.number().int().min(1).max(10000).optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: '沒有要修改的欄位' })
+export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>
 
 export const listingQuerySchema = z.object({
   stallId: uuidSchema.optional(),

@@ -2,10 +2,12 @@ import type {
   CreateParticipationInput,
   CreateStallInput,
   UpdateStallInput,
+  UpdateStallSelfInput,
 } from '@market/shared'
 import { prisma } from '../../lib/db.js'
 import { AppError, notFound } from '../../lib/errors.js'
 import { isUniqueViolation, issueInviteCode } from '../../lib/inviteCode.js'
+import { getSettings } from '../../lib/settings.js'
 import { dateToIsoDate, timeToHhmm } from '../../lib/time.js'
 import { assertMarketDayWritable } from '../market/service.js'
 
@@ -33,6 +35,17 @@ export async function listStalls() {
 }
 
 export async function createStall(input: CreateStallInput) {
+  // ⚠️ 規格外（2026-09-20 指示）：全站攤商數上限。
+  // 只算啟用中的——停用的攤位等於騰出來了。
+  const { maxStalls } = await getSettings()
+  const active = await prisma.stall.count({ where: { isActive: true } })
+  if (active >= maxStalls) {
+    throw new AppError(
+      'STALL_LIMIT_REACHED',
+      `攤商數已達上限 ${maxStalls} 攤，請先停用不再參與的攤商，或到系統設定調高上限`,
+    )
+  }
+
   const stall = await prisma.stall.create({ data: input })
   return { ...stall, memberCount: 0, members: [] }
 }
@@ -42,6 +55,34 @@ export async function updateStall(id: string, input: UpdateStallInput) {
   if (!existing) throw notFound('找不到攤商')
   const stall = await prisma.stall.update({ where: { id }, data: input })
   return stall
+}
+
+/**
+ * ⚠️ 規格外（委託方 2026-09-20 指示）：攤商自己看／改基本資料。
+ * 權限在 route 上用 assertStallMember 擋；這裡只負責欄位。
+ */
+export async function getStallProfile(stallId: string) {
+  const stall = await prisma.stall.findUnique({ where: { id: stallId } })
+  if (!stall) throw notFound('找不到攤商')
+  return {
+    id: stall.id,
+    name: stall.name,
+    description: stall.description,
+    contactName: stall.contactName,
+    contactPhone: stall.contactPhone,
+    logoUrl: stall.logoUrl,
+    isActive: stall.isActive,
+  }
+}
+
+export async function updateStallProfile(stallId: string, input: UpdateStallSelfInput) {
+  const stall = await prisma.stall.findUnique({ where: { id: stallId } })
+  if (!stall) throw notFound('找不到攤商')
+  if (!stall.isActive) {
+    throw new AppError('CONFLICT', '這個攤商已被停用，請聯絡主辦單位')
+  }
+  await prisma.stall.update({ where: { id: stallId }, data: input })
+  return getStallProfile(stallId)
 }
 
 // ---------------------------------------------------------------- 廠商：參與與邀請碼

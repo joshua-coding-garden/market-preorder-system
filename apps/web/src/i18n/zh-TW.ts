@@ -15,6 +15,10 @@ export const errorMessages: Record<string, string> = {
   UNAUTHENTICATED: '請先使用 LINE 登入',
   NOT_FOUND: '找不到資料',
   VALIDATION: '輸入內容有誤，請檢查後再送出',
+  // ⚠️ 規格外（2026-09-20 指示）
+  PRODUCT_LIMIT_REACHED: '商品數已達上限，請先下架用不到的商品',
+  STALL_LIMIT_REACHED: '攤商數已達上限',
+  NOT_CONFIRMED: '這筆訂單店家還沒確認',
 }
 
 export function errorMessage(code: ErrorCode | string | undefined): string {
@@ -29,6 +33,8 @@ export const marketDayStatusLabel: Record<string, string> = {
 }
 
 export const subOrderStatusLabel: Record<string, string> = {
+  // ⚠️ 規格外（2026-09-20 指示）：店家確認了才算訂單成立
+  PENDING_CONFIRM: '店家確認中',
   PENDING: '待取貨',
   PICKED_UP: '已取貨',
   NO_SHOW: '未取',
@@ -42,4 +48,11 @@ export const broadcastStatusLabel: Record<string, string> = {
   REJECTED: '已退回',
   SENT: '已送出',
   FAILED: '送出失敗',
+}
+
+/** ⚠️ 規格外（2026-09-20 指示）：上架審核狀態 */
+export const listingApprovalLabel: Record<string, string> = {
+  APPROVED: '已上架',
+  PENDING_REVIEW: '待審核',
+  REJECTED: '已退回',
 }

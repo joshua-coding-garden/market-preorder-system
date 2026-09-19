@@ -51,6 +51,13 @@ export default function OrderDetail() {
               <StatusBadge status={so.status} label={subOrderStatusLabel[so.status]} />
             </header>
 
+            {/* ⚠️ 規格外（2026-09-20）：店家還沒確認前，先別讓顧客以為訂單已經成立 */}
+            {so.status === 'PENDING_CONFIRM' ? (
+              <p className="border-b border-neutral-100 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800">
+                這攤還在確認中。店家確認接單後訂單才算成立，確認前請先不要前往取貨。
+              </p>
+            ) : null}
+
             <div className="flex flex-col items-center gap-1.5 border-b border-neutral-100 py-4">
               <span className="text-xs text-neutral-500">取貨碼</span>
               <PickupCode code={so.pickupCode} />

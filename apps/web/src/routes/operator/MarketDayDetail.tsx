@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import type { MarketDayDetail as DayDetail } from '@market/shared'
 import { api } from '@/api/client'
 import { toMessage, useApi } from '@/api/useApi'
@@ -294,6 +294,22 @@ export default function MarketDayDetail() {
                   ) : null}
                 </div>
               ) : null}
+
+              {/* ⚠️ 規格外（2026-09-20 指示）：管理員直接指定這攤在本場要賣什麼 */}
+              <div className="mt-3 flex flex-wrap gap-2 text-sm">
+                <Link
+                  to={`/stall/${p.stall.id}/days/${id}/listings`}
+                  className="rounded-lg border border-neutral-300 px-2.5 py-1.5"
+                >
+                  本場上架
+                </Link>
+                <Link
+                  to={`/stall/${p.stall.id}/products`}
+                  className="rounded-lg border border-neutral-300 px-2.5 py-1.5"
+                >
+                  商品
+                </Link>
+              </div>
 
               <p className="mt-2 text-xs text-neutral-400">
                 攤商在 LINE 輸入「邀請碼 {p.inviteCode?.code ?? 'XXXX'}」即可綁定

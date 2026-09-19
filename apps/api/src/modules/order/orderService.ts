@@ -64,6 +64,7 @@ async function serializeOrder(preorderId: string, client = prisma) {
       pickupCode: so.pickupCode,
       status: so.status,
       subtotal: so.subtotal,
+      confirmedAt: so.confirmedAt?.toISOString() ?? null,
       pickedUpAt: so.pickedUpAt?.toISOString() ?? null,
       items: so.items.map((i) => ({
         productCode: i.productCode,
@@ -100,7 +101,13 @@ async function createSubOrderWithPickupCode(
   for (let attempt = 0; attempt < PICKUP_CODE_MAX_ATTEMPTS; attempt += 1) {
     try {
       return await tx.subOrder.create({
-        data: { ...data, pickupCode: buildPickupCode(data.boothNo, serial) },
+        // ⚠️ 規格外（2026-09-20 指示）：下單先進「店家確認中」，
+        // 店家按了確認才變成 PENDING（訂單成立）。
+        data: {
+          ...data,
+          status: 'PENDING_CONFIRM',
+          pickupCode: buildPickupCode(data.boothNo, serial),
+        },
       })
     } catch (err) {
       if (isUniqueViolation(err, 'pickup_code')) {
@@ -176,8 +183,10 @@ export async function createOrder(
       })
     }
 
-    // 5. 預購上限：已售（PENDING + PICKED_UP）+ 本次 > max_qty → 409
+    // 5. 預購上限：已售 + 本次 > max_qty → 409
     //    NO_SHOW 與 CANCELLED 會釋出上限（04 §B）
+    //    ⚠️ 規格外（2026-09-20）：PENDING_CONFIRM 也要算進去，
+    //    否則店家還沒確認的期間會被其他人重複下單，變成超賣。
     const wantedByListing = new Map<string, number>()
     for (const item of cart.items) {
       wantedByListing.set(
@@ -193,7 +202,7 @@ export async function createOrder(
       const sold = await tx.orderItem.aggregate({
         where: {
           listingId,
-          subOrder: { status: { in: ['PENDING', 'PICKED_UP'] } },
+          subOrder: { status: { in: ['PENDING_CONFIRM', 'PENDING', 'PICKED_UP'] } },
         },
         _sum: { qty: true },
       })

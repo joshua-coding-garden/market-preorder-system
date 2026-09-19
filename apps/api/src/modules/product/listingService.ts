@@ -1,6 +1,7 @@
 import type { ListingInput } from '@market/shared'
 import { prisma } from '../../lib/db.js'
 import { notFound } from '../../lib/errors.js'
+import { getSettings } from '../../lib/settings.js'
 import { assertMarketDayWritable } from '../market/service.js'
 
 /**
@@ -23,6 +24,9 @@ export async function listStallListings(stallId: string, marketDayId: string) {
     price: l.price,
     maxQty: l.maxQty,
     status: l.status,
+    // ⚠️ 規格外（2026-09-20）：攤商要看得到自己在等審核還是被退回
+    approval: l.approval,
+    rejectReason: l.rejectReason,
   }))
 }
 
@@ -43,6 +47,13 @@ export async function replaceListings(
   const rejected = input.filter((l) => !ownedIds.has(l.productId))
   if (rejected.length > 0) throw notFound('有商品不屬於這個攤商')
 
+  // ⚠️ 規格外（2026-09-20）：開了審核，攤商送出的上架一律回到待審，
+  // 包含改價、改上限 —— 否則先過審再偷改價就繞過去了。
+  const { listingApprovalRequired } = await getSettings()
+  const approvalFields = listingApprovalRequired
+    ? { approval: 'PENDING_REVIEW' as const, rejectReason: null, reviewedAt: null, reviewedByUserId: null }
+    : { approval: 'APPROVED' as const, rejectReason: null }
+
   await prisma.$transaction(async (tx) => {
     for (const l of input) {
       await tx.listing.upsert({
@@ -55,8 +66,9 @@ export async function replaceListings(
           price: l.price,
           maxQty: l.maxQty ?? null,
           status: l.status,
+          ...approvalFields,
         },
-        update: { price: l.price, maxQty: l.maxQty ?? null, status: l.status },
+        update: { price: l.price, maxQty: l.maxQty ?? null, status: l.status, ...approvalFields },
       })
     }
 
@@ -85,6 +97,7 @@ export async function copyListingsFrom(
     select: { productId: true },
   })
   const existingIds = new Set(existing.map((l) => l.productId))
+  const { listingApprovalRequired: approvalRequired } = await getSettings()
 
   let copied = 0
   let skipped = 0
@@ -101,6 +114,7 @@ export async function copyListingsFrom(
         price: l.price,
         maxQty: l.maxQty,
         status: 'ON_SALE',
+        approval: approvalRequired ? 'PENDING_REVIEW' : 'APPROVED',
       },
     })
     copied += 1
@@ -124,6 +138,8 @@ export async function listPublicListings(
     where: {
       marketDayId,
       status: { not: 'OFF_SHELF' },
+      // ⚠️ 規格外（2026-09-20）：沒過審的不出現在顧客端
+      approval: 'APPROVED',
       product: {
         isActive: true,
         ...(filters.q

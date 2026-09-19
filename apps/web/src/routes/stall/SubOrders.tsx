@@ -32,6 +32,8 @@ export interface StallSubOrder {
 }
 
 const TABS: { value: SubOrderStatus; label: string }[] = [
+  // ⚠️ 規格外（2026-09-20）：待確認擺第一個，攤商一進來先看到要處理的
+  { value: 'PENDING_CONFIRM', label: '待確認' },
   { value: 'PENDING', label: '待取貨' },
   { value: 'PICKED_UP', label: '已取貨' },
   { value: 'NO_SHOW', label: '未取' },
@@ -44,7 +46,7 @@ const POLL_INTERVAL_MS = 60_000
 /** S6 訂單列表（即時） */
 export default function SubOrders() {
   const { stallId = '', dayId = '' } = useParams()
-  const [tab, setTab] = useState<SubOrderStatus>('PENDING')
+  const [tab, setTab] = useState<SubOrderStatus>('PENDING_CONFIRM')
   const [items, setItems] = useState<StallSubOrder[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [flashIds, setFlashIds] = useState<Set<string>>(new Set())

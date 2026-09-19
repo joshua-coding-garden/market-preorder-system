@@ -18,6 +18,13 @@ export const ErrorCode = {
   IMAGE_TOO_LARGE: 'IMAGE_TOO_LARGE',
   IMAGE_TYPE_UNSUPPORTED: 'IMAGE_TYPE_UNSUPPORTED',
   CONFLICT: 'CONFLICT',
+  // ⚠️ 規格外（委託方 2026-09-20 指示）
+  /** 攤商的上架品項數已達上限 */
+  PRODUCT_LIMIT_REACHED: 'PRODUCT_LIMIT_REACHED',
+  /** 全站攤商數已達上限 */
+  STALL_LIMIT_REACHED: 'STALL_LIMIT_REACHED',
+  /** 店家還沒確認這筆訂單 */
+  NOT_CONFIRMED: 'NOT_CONFIRMED',
 } as const
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode]
@@ -52,4 +59,7 @@ export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   IMAGE_TOO_LARGE: 400,
   IMAGE_TYPE_UNSUPPORTED: 400,
   CONFLICT: 409,
+  PRODUCT_LIMIT_REACHED: 409,
+  STALL_LIMIT_REACHED: 409,
+  NOT_CONFIRMED: 409,
 }

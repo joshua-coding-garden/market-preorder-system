@@ -15,9 +15,12 @@ interface ProductRow {
 /** S3 商品管理 */
 export default function Products() {
   const { stallId = '' } = useParams()
-  const { data, loading, error, reload } = useApi<{ items: ProductRow[] }>(
-    `/stalls/${stallId}/products?includeInactive=true`,
-  )
+  const { data, loading, error, reload } = useApi<{
+    items: ProductRow[]
+    limit: { used: number; max: number }
+  }>(`/stalls/${stallId}/products?includeInactive=true`)
+
+  const full = data ? data.limit.used >= data.limit.max : false
 
   return (
     <>
@@ -25,11 +28,33 @@ export default function Products() {
         title="商品管理"
         subtitle="商品跨場次共用；每場的售價與上限在「本場上架」設定"
         action={
-          <Link to={`/stall/${stallId}/products/new`} className="btn-primary text-sm">
-            新增商品
-          </Link>
+          full ? (
+            <span className="rounded-xl bg-neutral-100 px-3 py-2 text-xs text-neutral-500">
+              已達上限
+            </span>
+          ) : (
+            <Link to={`/stall/${stallId}/products/new`} className="btn-primary text-sm">
+              新增商品
+            </Link>
+          )
         }
       />
+
+      {/* 委託方 2026-09-20：品項上限與照片規範要讓攤商看得到 */}
+      {data ? (
+        <div className="mx-4 mb-3 rounded-xl bg-neutral-100 px-3 py-2.5 text-xs leading-relaxed text-neutral-600">
+          <p>
+            上架中的品項{' '}
+            <strong className={full ? 'text-red-600' : 'text-neutral-800'}>
+              {data.limit.used} / {data.limit.max}
+            </strong>
+            {full ? '　已達上限，要新增請先下架用不到的商品。' : ''}
+          </p>
+          <p className="mt-1">
+            商品照片每項 1 張，接受 JPG／PNG／WebP，單檔 8MB 以內；上傳後會自動壓成方便手機載入的尺寸。
+          </p>
+        </div>
+      ) : null}
 
       {loading ? <Spinner /> : null}
       {error ? <ErrorState message={error} onRetry={reload} /> : null}

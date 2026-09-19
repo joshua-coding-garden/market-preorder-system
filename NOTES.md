@@ -135,6 +135,122 @@ LINE Login 的 Callback URL 必須是外部連得到的 HTTPS 網址，`localhos
 
 ---
 
+## 規格外的追加（委託方 2026-09-20 需求清單）
+
+委託方在 2026-09-20 給了一份清單，以下全部實作完成。這一批的共同點是
+**動到了資料模型與狀態機**，不像先前幾項只是加畫面，因此偏離程度比之前大。
+
+### 1. 上架審核（可由後台開關）
+
+新增 `system_setting` 單列設定表（永遠只有 id=1，有 CHECK 擋），
+`listing_approval_required` 決定上架模式：
+
+| 模式 | 行為 |
+|---|---|
+| 攤商直接上架（預設） | 攤商儲存後 `listing.approval = APPROVED`，顧客馬上看得到 |
+| 管理員審核後才能上架 | 攤商儲存後進 `PENDING_REVIEW`，顧客端查詢會濾掉，管理員通過才出現 |
+
+`listing` 新增 `approval` / `reject_reason` / `reviewed_at` / `reviewed_by_user_id`。
+CHECK 約束保證「駁回一定有理由、通過一定沒有理由」。
+
+刻意的設計決定：
+
+- **改價、改上限也會重新送審**。只擋第一次上架的話，先過審再偷改價就繞過去了。
+- **強制上架一併蓋成 APPROVED**。審核開著時，管理員按了「上架」卻還是不出現在
+  顧客端會很難解釋。
+- **開啟審核不影響既有上架**，只套用在之後送出的異動（欄位預設 APPROVED）。
+
+新端點（全部 `assertOperator`）：
+`GET /operator/settings`、`PATCH /operator/settings`、
+`GET /operator/listings`、`POST /operator/listings/:id/approve`、
+`POST /operator/listings/:id/reject`、`PATCH /operator/listings/:id`。
+
+畫面：後台新增「商品審核」與「系統設定」兩頁；
+攤商的「本場上架」頁會顯示自己卡在待審還是被退回（含退回理由）。
+
+### 2. 訂單要店家確認才成立（偏離 02 §C、04 §B）
+
+`SubOrderStatus` 新增 **`PENDING_CONFIRM`**，排在 `PENDING` 前面。
+下單後子單一律是 `PENDING_CONFIRM`，攤商按「確認接單」才變 `PENDING`。
+
+| 影響 | 做法 |
+|---|---|
+| 核銷 | `PENDING_CONFIRM` 直接核銷回 409 `NOT_CONFIRMED` |
+| 預購上限 | `PENDING_CONFIRM` **要**計入已售，否則確認期間會被重複下單、超賣 |
+| 備貨總表 | `PENDING_CONFIRM` **不**計入——店家還沒接單就先備料等於自己吃風險 |
+| 關場 | 還沒確認的 → `CANCELLED`（店家沒回應），已確認未取的才是 `NO_SHOW` |
+| 婉拒 | 攤商可以直接把 `PENDING_CONFIRM` 轉 `CANCELLED`，額度會還回去 |
+
+`sub_order` 新增 `confirmed_at` / `confirmed_by_user_id`。
+migration 把既有訂單的 `confirmed_at` 補成 `created_at`：它們是在這個機制上線前
+成立的，不該要求攤商回頭重按一次。
+
+新端點：`POST /stalls/:stallId/sub-orders/:id/confirm`。
+
+> ⚠️ **沒有為「店家已確認」發 LINE 通知**。spec §10 沒有這種通知類型，
+> 加了會多吃訊息額度（B-11）。顧客要自己回「我的訂單」看狀態。
+> 若委託方要這則通知，需要先確認額度預算。
+
+### 3. 容量上限
+
+存在 `system_setting`，後台可調：
+
+- `max_products_per_stall`（預設 10）：只算 `is_active` 的商品，下架的不佔額度。
+  超過回 409 `PRODUCT_LIMIT_REACHED`。
+- `max_stalls`（預設 200）：只算 `is_active` 的攤商，停用的不佔額度。
+  超過回 409 `STALL_LIMIT_REACHED`。
+
+`GET /stalls/:stallId/products` 順便回 `limit: { used, max }`，
+攤商的商品頁才顯示得出「上架中的品項 3 / 10」並在額滿時把「新增商品」換掉。
+
+### 4. 照片規範
+
+原本就已經符合要求，這次只是**把規則寫到畫面上**：
+每項商品 1 張、JPG／PNG／WebP、單檔 8MB、上傳後自動轉正並壓成 WebP
+（主圖最長邊 1200、縮圖 400）。手機用 `<input type="file" accept="image/...">`，
+相簿與拍照都走得通。
+
+### 5. 市集停用
+
+`market` 新增 `is_active`。停用後：顧客端場次列表與詳情都看不到該市集的場次、
+不能再開新場次；既有訂單資料完全不動，隨時可恢復。
+`PATCH /operator/markets/:id`（也能改名稱、地點、說明）。
+
+### 6. 攤商自助維護基本資料
+
+`GET /stalls/:stallId`、`PATCH /stalls/:stallId`（`assertStallMember`）。
+schema 用 `.strict()`，所以攤商送 `isActive` 會直接 400 ——
+**停用／恢復是主辦單位的權限，攤商不能自己關掉自己**。
+
+### 7. 管理員的商品管理入口
+
+「查看、修改及刪除商品」「修改商品圖片、介紹及價格」「指定商品所屬市集」
+這幾項後端本來就允許 operator 代操作（`assertStallMember` 對 operator 直接放行），
+缺的只是**入口**，所以沒有另做一套後台商品畫面，而是接到既有的攤商畫面：
+
+- 後台「攤商」頁 → 每攤的「商品」「基本資料」
+- 後台「場次詳情」→ 每個參與攤商的「本場上架」（＝指定商品所屬市集）
+
+重做一套只會讓兩邊的驗證邏輯慢慢長歪。
+
+### 8. 顧客端文案與動線
+
+- 「前往結帳」→「前往訂購」，結帳頁標題改「訂購」（本系統不收線上付款，
+  講「結帳」會讓人以為要線上付錢）
+- 購物車底部加「繼續購物」（回場次頁），每一攤的標題列加「繼續逛這攤 ›」
+  （回該攤商品頁）—— 原本進了購物車就沒有回頭挑商品的入口
+- 訂單列表與詳情顯示「店家確認中」；詳情頁在未確認時擋一句
+  「確認前請先不要前往取貨」
+- 首頁新增「怎麼預購？」四步驟說明，看過一次後自動收合（記在 localStorage）
+
+### 測試與驗證
+
+- API 測試 219 筆全綠（新增 `review.test.ts` 22 筆、`confirm.test.ts` 11 筆）
+- 既有測試因狀態機改變而更新：`fixtures.ts` 的 `placeOrder` 預設會把子單推進到
+  `PENDING`（要驗確認流程本身的測試傳 `{ confirm: false }`）
+- 端對端（打真的 API）36 項全過、375px 版面與新畫面 29 項全過
+
+
 ## Non-goals 確認（00 §C）
 
 本 Sprint 未觸及、且全期都不做：線上金流／退款／發票、簡訊 OTP、攤商自助註冊、

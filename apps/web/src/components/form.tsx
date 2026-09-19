@@ -53,6 +53,8 @@ const BADGE_STYLES: Record<string, string> = {
   REDEEMED: 'bg-green-100 text-green-700',
   EXPIRED: 'bg-neutral-100 text-neutral-500',
   RECYCLED: 'bg-neutral-100 text-neutral-400',
+  // ⚠️ 規格外（2026-09-20）：還沒被店家接單，用琥珀色提醒「還沒定案」
+  PENDING_CONFIRM: 'bg-amber-100 text-amber-800',
   PENDING: 'bg-blue-100 text-blue-700',
   PICKED_UP: 'bg-green-100 text-green-700',
   NO_SHOW: 'bg-neutral-200 text-neutral-500',

@@ -7,6 +7,7 @@ import { prisma } from '../../lib/db.js'
 import { AppError, notFound } from '../../lib/errors.js'
 import { deleteImage, storeImage } from '../../lib/image.js'
 import { isUniqueViolation } from '../../lib/inviteCode.js'
+import { getSettings } from '../../lib/settings.js'
 
 /**
  * 攤商商品與內容物（03 §4）。
@@ -74,6 +75,17 @@ async function getOwnedProduct(stallId: string, productId: string) {
 }
 
 export async function createProduct(stallId: string, input: CreateProductInput) {
+  // ⚠️ 規格外（2026-09-20 指示）：每攤品項上限。
+  // 只算上架中的——下架（is_active=false）的商品不佔額度。
+  const { maxProductsPerStall } = await getSettings()
+  const current = await prisma.product.count({ where: { stallId, isActive: true } })
+  if (current >= maxProductsPerStall) {
+    throw new AppError(
+      'PRODUCT_LIMIT_REACHED',
+      `每個攤商最多 ${maxProductsPerStall} 項商品，請先下架用不到的商品`,
+    )
+  }
+
   try {
     const product = await prisma.product.create({
       data: {
