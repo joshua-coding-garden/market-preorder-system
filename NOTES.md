@@ -243,9 +243,31 @@ schema 用 `.strict()`，所以攤商送 `isActive` 會直接 400 ——
   「確認前請先不要前往取貨」
 - 首頁新增「怎麼預購？」四步驟說明，看過一次後自動收合（記在 localStorage）
 
+### 9. 首頁市集入口（-k）
+
+**背景**：委託方要在同一套系統下經營兩個市集（冰町小日子、美村小日子），
+首頁要一個市集一顆按鈕。`Market` 資料表本來就有，只是顧客端沒有市集層級的入口，
+C1 直接列出所有市集的場次。
+
+**做法**：
+
+| 項目 | 內容 |
+|---|---|
+| `GET /markets` | 公開，回所有市集 `{ id, code, name, location }`，依代號排序 |
+| `GET /market-days?marketId=` | 原端點加一個篩選，其餘不變 |
+| C0 `/` | 新畫面 `routes/customer/MarketHome.tsx`，每個市集一張卡，按鈕直接由資料表產生，後台 O2 建了市集就會出現 |
+| C1 `/markets/:marketId` | 原本的場次列表搬到這條路由，只列該市集，標題改成市集名 |
+
+LINE 圖文選單與歡迎訊息的「本週市集」仍指向 `/`，現在會落在市集選單。
+第三顆「最新活動／其他市集」需求未明，先不放。
+
+**移除方式**：`App.tsx` 把 index 路由改回 `<MarketDayList />`、刪 `markets/:marketId` 路由與
+`MarketHome.tsx`；`MarketDayList.tsx` 拿掉 `marketId` 即可。API 的兩處可留，沒人呼叫也無害。
+
 ### 測試與驗證
 
 - API 測試 219 筆全綠（新增 `review.test.ts` 22 筆、`confirm.test.ts` 11 筆）
+- 第 9 項另有 `market.test.ts` 5 筆，全部測試見「交付狀態」
 - 既有測試因狀態機改變而更新：`fixtures.ts` 的 `placeOrder` 預設會把子單推進到
   `PENDING`（要驗確認流程本身的測試傳 `{ confirm: false }`）
 - 端對端（打真的 API）36 項全過、375px 版面與新畫面 29 項全過
@@ -691,8 +713,8 @@ production bundle：JS 390 KB（gzip 115 KB）、CSS 25 KB（gzip 5 KB）。
 ## 完成度
 
 - **8 個 Sprint 全部實作完成**（Sprint 0～7）
-- **27 個畫面**（05-畫面規格.md）全部完成
-- **自動測試 159 項全綠**，涵蓋 07-驗收條件.md 所有 `[auto]` 項目
+- **27 個畫面**（05-畫面規格.md）全部完成，另有規格外的 C0 市集入口
+- **自動測試 224 項全綠**，涵蓋 07-驗收條件.md 所有 `[auto]` 項目
 - `pnpm typecheck`／`pnpm lint` 皆無錯誤
 
 | 測試檔 | 測項 | 對應驗收 |
@@ -711,6 +733,9 @@ production bundle：JS 390 KB（gzip 115 KB）、CSS 25 KB（gzip 5 KB）。
 | `webhook.test.ts` | 13 | S5-1～4 |
 | `notification.test.ts` | 13 | S5-5～7 |
 | `broadcast.test.ts` | 17 | S6-1～8 |
+| `review.test.ts` | 22 | 規格外（2026-09-20）：上架審核、容量上限 |
+| `confirm.test.ts` | 11 | 規格外（2026-09-20）：訂單店家確認 |
+| `market.test.ts` | 5 | 規格外（2026-09-20）：首頁市集入口 |
 
 ## 待委託方執行的項目
 
@@ -890,7 +915,6 @@ DROP TABLE local_credential;
 **移除方式**：刪掉 `components/AuthMenu.tsx`、把三個 Layout 的 `<AuthMenu />`
 換回原本的「登入」連結／「回顧客頁」連結，並把 `/auth/logout` 的 `requireAuth` 加回去。
 （`components/Sheet.tsx` 可以留著，`ImpersonatePicker` 在用。）
-
 
 ## Non-goals 確認（00 §C）
 

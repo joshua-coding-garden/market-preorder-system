@@ -64,8 +64,9 @@ export type LocalLoginInput = z.infer<typeof localLoginSchema>
 
 // ---------- §2 市集與場次 ----------
 
-/** GET /market-days（顧客用；只會回 PUBLISHED） */
+/** GET /market-days（顧客用；只會回 PUBLISHED；marketId 只看某市集） */
 export const marketDayListQuerySchema = z.object({
+  marketId: uuidSchema.optional(),
   status: z.literal('PUBLISHED').optional(),
   from: isoDateSchema.optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),

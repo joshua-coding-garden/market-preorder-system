@@ -1,6 +1,7 @@
 import type {
   CreateMarketDayInput,
   CreateMarketInput,
+  MarketBrief,
   MarketDayDetail,
   MarketDayListItem,
   Paged,
@@ -69,10 +70,23 @@ export async function assertMarketDayWritable(
 // ---------------------------------------------------------------- 顧客端
 
 /**
+ * GET /markets（顧客用；規格外的首頁市集入口）：啟用中的市集，依代號排序。
+ * 停用的市集（2026-09-20 的市集停用）在這裡就濾掉，首頁才不會出現點進去是空的按鈕。
+ */
+export async function listPublicMarkets(): Promise<MarketBrief[]> {
+  return prisma.market.findMany({
+    where: { isActive: true },
+    orderBy: { code: 'asc' },
+    select: { id: true, code: true, name: true, location: true },
+  })
+}
+
+/**
  * GET /market-days（顧客用）：只回 PUBLISHED（S0-6）。
- * 無參數時回「今天（台北）起」最近 10 場。
+ * 無參數時回「今天（台北）起」最近 10 場；帶 marketId 只回該市集。
  */
 export async function listPublishedMarketDays(params: {
+  marketId?: string
   from?: string
   limit?: number
   cursor?: string
@@ -86,6 +100,7 @@ export async function listPublishedMarketDays(params: {
       status: 'PUBLISHED',
       eventDate: { gte: isoDateToDate(from) },
       market: { isActive: true },
+      ...(params.marketId ? { marketId: params.marketId } : {}),
     },
     include: { market: true, _count: { select: { participations: true } } },
     orderBy: [{ eventDate: 'asc' }, { id: 'asc' }],

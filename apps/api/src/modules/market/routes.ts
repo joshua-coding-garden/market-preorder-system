@@ -1,4 +1,5 @@
 // 權限（04 §H）：
+//   GET  /markets                  公開（規格外：首頁市集入口）
 //   GET  /market-days              公開（只回 PUBLISHED）
 //   GET  /market-days/:id          公開；DRAFT 需 operator 才看得到
 //   /operator/markets*             requireAuth → assertOperator
@@ -35,6 +36,7 @@ import {
   getMarketDayDetail,
   listMarkets,
   listOperatorMarketDays,
+  listPublicMarkets,
   listPublishedMarketDays,
   publishMarketDay,
   unpublishMarketDay,
@@ -48,6 +50,10 @@ const listQuerySchema = marketDayListQuerySchema.extend({
 
 const marketRoutes: FastifyPluginAsync = async (app) => {
   // ---------------- 顧客端 ----------------
+
+  app.get('/markets', async () => {
+    return { items: await listPublicMarkets() }
+  })
 
   app.get('/market-days', async (req) => {
     const query = listQuerySchema.parse(req.query)

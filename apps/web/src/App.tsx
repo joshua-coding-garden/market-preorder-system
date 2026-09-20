@@ -5,6 +5,7 @@ import { SessionProvider } from '@/store/session'
 import CustomerLayout from '@/routes/customer/Layout'
 import Login from '@/routes/customer/Login'
 import MarketDayList from '@/routes/customer/MarketDayList'
+import MarketHome from '@/routes/customer/MarketHome'
 import Cart from '@/routes/customer/Cart'
 import Checkout from '@/routes/customer/Checkout'
 import CustomerOrderDetail from '@/routes/customer/OrderDetail'
@@ -43,7 +44,7 @@ import { RequireCapability } from '@/routes/guard'
  *   /          顧客
  *   /stall     攤商
  *   /operator  廠商
- * 27 個畫面（05-畫面規格.md）全部實作完成。
+ * 27 個畫面（05-畫面規格.md）全部實作完成；另有規格外的 C0 市集入口。
  */
 export default function App() {
   return (
@@ -53,7 +54,8 @@ export default function App() {
         <Routes>
           {/* 顧客 View */}
           <Route element={<CustomerLayout />}>
-            <Route index element={<MarketDayList />} />
+            <Route index element={<MarketHome />} />
+            <Route path="markets/:marketId" element={<MarketDayList />} />
             <Route path="login" element={<Login />} />
             <Route path="days/:dayId" element={<MarketDayPage />} />
             <Route path="days/:dayId/products/:listingId" element={<ProductDetail />} />
