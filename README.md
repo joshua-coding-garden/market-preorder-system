@@ -276,7 +276,7 @@ market-preorder/
 │   │   │   └── server.ts
 │   │   ├── prisma/          schema.prisma、migrations、seed.ts、seed-demo.ts
 │   │   ├── scripts/         richmenu.ts
-│   │   └── tests/           18 個測試檔，224 測項
+│   │   └── tests/           19 個測試檔，242 測項
 │   └── web/                 React 前端（顧客／攤商／廠商三個 view 用路由分）
 │       └── src/
 │           ├── routes/      customer/  stall/  operator/
@@ -357,6 +357,6 @@ market-preorder/
 - [x] Sprint 5：LINE Bot 與系統通知
 - [x] Sprint 6：推播申請與審核
 - [x] Sprint 7：硬化與交付（**手動驗收項目待委託方執行**，見 NOTES.md）
-- [x] 追加（2026-09-20）：首頁市集入口（C0）。規格外，見 NOTES.md
+- [x] 追加（2026-09-20）：首頁市集入口（C0）、廠商後台搜尋（O9）。規格外，見 NOTES.md
 
-`05-畫面規格.md` 的 27 個畫面全部實作完成，另有規格外的 C0 畫面；自動測試 224 項全綠。
+`05-畫面規格.md` 的 27 個畫面全部實作完成，另有規格外的 C0、O9 兩個畫面；自動測試 242 項全綠。

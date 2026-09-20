@@ -1,6 +1,7 @@
 import type {
   CreateParticipationInput,
   CreateStallInput,
+  OperatorStallListQuery,
   UpdateStallInput,
   UpdateStallSelfInput,
 } from '@market/shared'
@@ -13,25 +14,52 @@ import { assertMarketDayWritable } from '../market/service.js'
 
 // ---------------------------------------------------------------- 廠商：攤商
 
-export async function listStalls() {
+/**
+ * 攤商列表；無條件時回全部（O5）。
+ * 規格外的搜尋條件：q 比對名稱或聯絡人（不分大小寫）、marketId 取「參加過該市集任一場次」的攤商、
+ * isActive 篩啟用狀態。「所屬市集」沒有欄位，由參與紀錄推導後放在 markets。
+ */
+export async function listStalls(filters: OperatorStallListQuery = {}) {
   const stalls = await prisma.stall.findMany({
+    where: {
+      ...(filters.q
+        ? {
+            OR: [
+              { name: { contains: filters.q, mode: 'insensitive' } },
+              { contactName: { contains: filters.q, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+      ...(filters.marketId
+        ? { participations: { some: { marketDay: { marketId: filters.marketId } } } }
+        : {}),
+      ...(filters.isActive !== undefined ? { isActive: filters.isActive } : {}),
+    },
     orderBy: { name: 'asc' },
     include: {
       _count: { select: { members: true } },
       members: { include: { user: { select: { id: true, displayName: true } } } },
+      participations: {
+        select: { marketDay: { select: { market: { select: { id: true, name: true } } } } },
+      },
     },
   })
-  return stalls.map((s) => ({
-    id: s.id,
-    name: s.name,
-    description: s.description,
-    contactName: s.contactName,
-    contactPhone: s.contactPhone,
-    logoUrl: s.logoUrl,
-    isActive: s.isActive,
-    memberCount: s._count.members,
-    members: s.members.map((m) => ({ id: m.user.id, displayName: m.user.displayName })),
-  }))
+  return stalls.map((s) => {
+    const markets = new Map<string, string>()
+    for (const p of s.participations) markets.set(p.marketDay.market.id, p.marketDay.market.name)
+    return {
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      contactName: s.contactName,
+      contactPhone: s.contactPhone,
+      logoUrl: s.logoUrl,
+      isActive: s.isActive,
+      memberCount: s._count.members,
+      members: s.members.map((m) => ({ id: m.user.id, displayName: m.user.displayName })),
+      markets: [...markets].map(([id, name]) => ({ id, name })),
+    }
+  })
 }
 
 export async function createStall(input: CreateStallInput) {

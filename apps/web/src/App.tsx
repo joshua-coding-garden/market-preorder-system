@@ -23,6 +23,7 @@ import OperatorBroadcasts from '@/routes/operator/Broadcasts'
 import OperatorDashboard from '@/routes/operator/Dashboard'
 import OperatorDayOrders from '@/routes/operator/DayOrders'
 import OperatorListings from '@/routes/operator/Listings'
+import OperatorSearch from '@/routes/operator/Search'
 import OperatorSettings from '@/routes/operator/Settings'
 import OperatorStalls from '@/routes/operator/Stalls'
 import StallLayout from '@/routes/stall/Layout'
@@ -44,7 +45,7 @@ import { RequireCapability } from '@/routes/guard'
  *   /          顧客
  *   /stall     攤商
  *   /operator  廠商
- * 27 個畫面（05-畫面規格.md）全部實作完成；另有規格外的 C0 市集入口。
+ * 27 個畫面（05-畫面規格.md）全部實作完成；另有規格外的 C0 市集入口、O9 後台搜尋。
  */
 export default function App() {
   return (
@@ -114,6 +115,7 @@ export default function App() {
             <Route path="days/:id" element={<MarketDayDetail />} />
             <Route path="stalls" element={<OperatorStalls />} />
             <Route path="listings" element={<OperatorListings />} />
+            <Route path="search" element={<OperatorSearch />} />
             <Route path="settings" element={<OperatorSettings />} />
             <Route path="permissions" element={<Permissions />} />
             <Route path="days/:id/orders" element={<OperatorDayOrders />} />

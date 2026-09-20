@@ -264,10 +264,34 @@ LINE 圖文選單與歡迎訊息的「本週市集」仍指向 `/`，現在會�
 **移除方式**：`App.tsx` 把 index 路由改回 `<MarketDayList />`、刪 `markets/:marketId` 路由與
 `MarketHome.tsx`；`MarketDayList.tsx` 拿掉 `marketId` 即可。API 的兩處可留，沒人呼叫也無害。
 
+### 10. 廠商後台搜尋（-k）
+
+**背景**：委託方要能依攤商名稱、聯絡人、商品名稱、所屬市集、帳號狀態、商品狀態找東西，
+並看單一攤商的全部商品。O5 攤商管理只有一張沒有篩選的表，商品只能從攤商專區逐攤看。
+
+**做法**：
+
+| 項目 | 內容 |
+|---|---|
+| `GET /operator/stalls` | 加 `q`（名稱或聯絡人，不分大小寫）、`marketId`、`isActive`；回應多一個 `markets`。無參數行為同原本，O5 不用改 |
+| `GET /operator/products` | 新端點，`q`（名稱或代碼）、`marketId`、`stallId`、`isActive`；最多回 200 筆並標 `truncated` |
+| O9 `/operator/search` | 新畫面 `routes/operator/Search.tsx`，攤商／商品兩個頁籤，條件全放 query string |
+
+幾個定義（委託方 2026-09-20 確認）：
+
+- **所屬市集**：攤商沒有綁市集的欄位，用「參加過該市集任一場次」推導（不分場次狀態）。
+  沒參加過任何場次的攤商，篩市集時不會出現。
+- **帳號狀態**：`Stall.isActive`（啟用中／已停用），不是使用者帳號。
+- **商品狀態**：`Product.isActive`（上架／下架），不是本場上架狀態。
+- 攤商列的「全部商品」是一條連結 `?tab=products&stallId=`，所以篩選狀態必須在網址上。
+
+**移除方式**：刪 `Search.tsx`、`App.tsx` 的 `search` 路由、後台 NAV 的「搜尋」；
+`listStalls` 的 `filters` 參數與 `markets` 欄位、`GET /operator/products` 可留可刪。
+
 ### 測試與驗證
 
 - API 測試 219 筆全綠（新增 `review.test.ts` 22 筆、`confirm.test.ts` 11 筆）
-- 第 9 項另有 `market.test.ts` 5 筆，全部測試見「交付狀態」
+- 第 9、10 項另有 `market.test.ts` 5 筆、`search.test.ts` 18 筆，全部測試見「交付狀態」
 - 既有測試因狀態機改變而更新：`fixtures.ts` 的 `placeOrder` 預設會把子單推進到
   `PENDING`（要驗確認流程本身的測試傳 `{ confirm: false }`）
 - 端對端（打真的 API）36 項全過、375px 版面與新畫面 29 項全過
@@ -713,8 +737,8 @@ production bundle：JS 390 KB（gzip 115 KB）、CSS 25 KB（gzip 5 KB）。
 ## 完成度
 
 - **8 個 Sprint 全部實作完成**（Sprint 0～7）
-- **27 個畫面**（05-畫面規格.md）全部完成，另有規格外的 C0 市集入口
-- **自動測試 224 項全綠**，涵蓋 07-驗收條件.md 所有 `[auto]` 項目
+- **27 個畫面**（05-畫面規格.md）全部完成，另有規格外的 C0 市集入口、O9 後台搜尋
+- **自動測試 242 項全綠**，涵蓋 07-驗收條件.md 所有 `[auto]` 項目
 - `pnpm typecheck`／`pnpm lint` 皆無錯誤
 
 | 測試檔 | 測項 | 對應驗收 |
@@ -736,6 +760,7 @@ production bundle：JS 390 KB（gzip 115 KB）、CSS 25 KB（gzip 5 KB）。
 | `review.test.ts` | 22 | 規格外（2026-09-20）：上架審核、容量上限 |
 | `confirm.test.ts` | 11 | 規格外（2026-09-20）：訂單店家確認 |
 | `market.test.ts` | 5 | 規格外（2026-09-20）：首頁市集入口 |
+| `search.test.ts` | 18 | 規格外（2026-09-20）：後台搜尋 |
 
 ## 待委託方執行的項目
 

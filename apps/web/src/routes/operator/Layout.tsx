@@ -7,6 +7,7 @@ const NAV = [
   { to: '/operator', label: '儀表板', end: true },
   { to: '/operator/days', label: '場次' },
   { to: '/operator/stalls', label: '攤商' },
+  { to: '/operator/search', label: '搜尋' },
   // ⚠️ 規格外（2026-09-20 指示）
   { to: '/operator/listings', label: '商品審核' },
   { to: '/operator/markets', label: '市集' },

@@ -1,5 +1,6 @@
 import type {
   CreateProductInput,
+  OperatorProductListQuery,
   ProductComponentInput,
   UpdateProductInput,
 } from '@market/shared'
@@ -51,6 +52,51 @@ function serializeProduct(p: {
       sortOrder: c.sortOrder,
     })),
   }
+}
+
+/** 後台搜尋一次最多回幾筆；超過就回 truncated 請使用者縮小條件。 */
+const OPERATOR_PRODUCT_LIMIT = 200
+
+/**
+ * GET /operator/products（規格外的後台搜尋）：跨攤商找商品。
+ * q 比對名稱或代碼（不分大小寫）；marketId 取「攤商參加過該市集任一場次」的商品；
+ * stallId 看單一攤商全部商品；isActive 篩上架狀態。
+ */
+export async function listOperatorProducts(filters: OperatorProductListQuery) {
+  const rows = await prisma.product.findMany({
+    where: {
+      ...(filters.q
+        ? {
+            OR: [
+              { name: { contains: filters.q, mode: 'insensitive' } },
+              { code: { contains: filters.q, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+      ...(filters.stallId ? { stallId: filters.stallId } : {}),
+      ...(filters.marketId
+        ? {
+            stall: {
+              participations: { some: { marketDay: { marketId: filters.marketId } } },
+            },
+          }
+        : {}),
+      ...(filters.isActive !== undefined ? { isActive: filters.isActive } : {}),
+    },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      basePrice: true,
+      thumbUrl: true,
+      isActive: true,
+      stall: { select: { id: true, name: true } },
+    },
+    orderBy: [{ stall: { name: 'asc' } }, { sortOrder: 'asc' }, { code: 'asc' }],
+    take: OPERATOR_PRODUCT_LIMIT + 1,
+  })
+  const truncated = rows.length > OPERATOR_PRODUCT_LIMIT
+  return { items: truncated ? rows.slice(0, OPERATOR_PRODUCT_LIMIT) : rows, truncated }
 }
 
 export async function listProducts(stallId: string, includeInactive = false) {

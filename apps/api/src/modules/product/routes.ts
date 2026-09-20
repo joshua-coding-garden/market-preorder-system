@@ -1,12 +1,14 @@
 // 權限（04 §H）：
 //   所有 /stalls/:stallId/* 端點   requireAuth → assertStallMember(userId, stallId)
 //   GET /market-days/:id/listings  公開（只回 PUBLISHED 場次的商品）
+//   GET /operator/products         requireAuth → assertOperator（規格外的後台搜尋）
 import type { FastifyPluginAsync } from 'fastify'
 import {
   copyListingsSchema,
   createProductSchema,
   idParamSchema,
   listingQuerySchema,
+  operatorProductListQuerySchema,
   productListQuerySchema,
   replaceComponentsSchema,
   replaceListingsSchema,
@@ -18,7 +20,7 @@ import {
 import { AppError } from '../../lib/errors.js'
 import { MAX_IMAGE_BYTES, assertAcceptableImage } from '../../lib/image.js'
 import { getSettings } from '../../lib/settings.js'
-import { assertStallMember, requireAuth } from '../../plugins/authz.js'
+import { assertOperator, assertStallMember, requireAuth } from '../../plugins/authz.js'
 import {
   copyListingsFrom,
   listPublicListings,
@@ -28,6 +30,7 @@ import {
 import {
   createProduct,
   deactivateProduct,
+  listOperatorProducts,
   listProducts,
   replaceComponents,
   setProductImage,
@@ -41,6 +44,15 @@ const productRoutes: FastifyPluginAsync = async (app) => {
     const { id } = idParamSchema.parse(req.params)
     const filters = listingQuerySchema.parse(req.query)
     return { items: await listPublicListings(id, filters) }
+  })
+
+  // ---------------- 廠商：商品搜尋 ----------------
+
+  app.get('/operator/products', async (req) => {
+    const userId = requireAuth(req)
+    await assertOperator(userId)
+    const filters = operatorProductListQuerySchema.parse(req.query)
+    return listOperatorProducts(filters)
   })
 
   // ---------------- 攤商：商品 ----------------

@@ -13,6 +13,11 @@ import {
   uuidSchema,
 } from './primitives.js'
 
+/** query string 的布林：?x=true / ?x=false（JSON body 傳真布林也接受） */
+const queryBoolSchema = z
+  .union([z.boolean(), z.enum(['true', 'false'])])
+  .transform((v) => v === true || v === 'true')
+
 // ---------- §1 Auth ----------
 
 /** GET /auth/line/start?redirect=/path：只接受站內相對路徑，避免 open redirect */
@@ -154,6 +159,17 @@ export const updateMarketSchema = z.object({
 })
 export type UpdateMarketInput = z.infer<typeof updateMarketSchema>
 
+/**
+ * GET /operator/stalls（規格外的後台搜尋）
+ * q：攤商名稱或聯絡人；marketId：參加過該市集任一場次；isActive：啟用狀態。
+ */
+export const operatorStallListQuerySchema = z.object({
+  q: z.string().trim().max(50).optional(),
+  marketId: uuidSchema.optional(),
+  isActive: queryBoolSchema.optional(),
+})
+export type OperatorStallListQuery = z.infer<typeof operatorStallListQuerySchema>
+
 /** POST /operator/market-days/:id/participations */
 export const createParticipationSchema = z.object({
   stallId: uuidSchema,
@@ -210,11 +226,17 @@ export const replaceComponentsSchema = z.array(productComponentInputSchema).max(
 export type ReplaceComponentsInput = z.infer<typeof replaceComponentsSchema>
 
 export const productListQuerySchema = z.object({
-  includeInactive: z
-    .union([z.boolean(), z.enum(['true', 'false'])])
-    .transform((v) => v === true || v === 'true')
-    .optional(),
+  includeInactive: queryBoolSchema.optional(),
 })
+
+/**
+ * GET /operator/products（規格外的後台搜尋）
+ * q：商品名稱或代碼；marketId：攤商參加過該市集；stallId：單一攤商；isActive：上架狀態。
+ */
+export const operatorProductListQuerySchema = operatorStallListQuerySchema.extend({
+  stallId: uuidSchema.optional(),
+})
+export type OperatorProductListQuery = z.infer<typeof operatorProductListQuerySchema>
 
 // ---------- §5 本場上架 ----------
 

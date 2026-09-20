@@ -11,6 +11,7 @@ import {
   createParticipationSchema,
   createStallSchema,
   idParamSchema,
+  operatorStallListQuerySchema,
   pickupLookupSchema,
   redeemInviteSchema,
   stallDayParamSchema,
@@ -62,7 +63,8 @@ const stallRoutes: FastifyPluginAsync = async (app) => {
   app.get('/operator/stalls', async (req) => {
     const userId = requireAuth(req)
     await assertOperator(userId)
-    return { items: await listStalls() }
+    const filters = operatorStallListQuerySchema.parse(req.query)
+    return { items: await listStalls(filters) }
   })
 
   app.post('/operator/stalls', async (req, reply) => {
