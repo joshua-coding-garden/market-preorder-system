@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { SubOrderStatus } from '@market/shared'
 import { api } from '@/api/client'
@@ -6,6 +6,7 @@ import { useStallSocket } from '@/api/socket'
 import { EmptyState, ErrorState, MoneyTWD, PageHeader, Spinner } from '@/components/common'
 import { StatusBadge } from '@/components/form'
 import { subOrderStatusLabel } from '@/i18n/zh-TW'
+import DayTabs from './DayTabs'
 
 export interface StallSubOrder {
   id: string
@@ -43,23 +44,25 @@ const TABS: { value: SubOrderStatus; label: string }[] = [
 /** 備援 polling 間隔（D-08：socket 斷線時靠這個補） */
 const POLL_INTERVAL_MS = 60_000
 
-/** S6 訂單列表（即時） */
+/**
+ * S6 訂單列表（即時）。
+ * ⚠️ 規格外（2026-10-18，參考 OnlineMenu）：一次抓這個場次的全部訂單、在前端依狀態分頁，
+ * 狀態膠囊才能直接顯示各狀態的筆數。
+ */
 export default function SubOrders() {
   const { stallId = '', dayId = '' } = useParams()
   const [tab, setTab] = useState<SubOrderStatus>('PENDING_CONFIRM')
-  const [items, setItems] = useState<StallSubOrder[] | null>(null)
+  const [all, setAll] = useState<StallSubOrder[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [flashIds, setFlashIds] = useState<Set<string>>(new Set())
   const [lastSync, setLastSync] = useState<Date | null>(null)
-  const tabRef = useRef(tab)
-  tabRef.current = tab
 
   const load = useCallback(async () => {
     try {
       const res = await api.get<{ items: StallSubOrder[] }>(
-        `/stalls/${stallId}/market-days/${dayId}/sub-orders?status=${tabRef.current}`,
+        `/stalls/${stallId}/market-days/${dayId}/sub-orders`,
       )
-      setItems(res.items)
+      setAll(res.items)
       setLastSync(new Date())
       setError(null)
     } catch {
@@ -68,9 +71,9 @@ export default function SubOrders() {
   }, [stallId, dayId])
 
   useEffect(() => {
-    setItems(null)
+    setAll(null)
     void load()
-  }, [load, tab])
+  }, [load])
 
   // 60 秒 polling 備援（D-08）
   useEffect(() => {
@@ -94,10 +97,15 @@ export default function SubOrders() {
     onOrderStatus: () => void load(),
   })
 
+  const items = all?.filter((so) => so.status === tab) ?? null
+  const countOf = (status: SubOrderStatus) => all?.filter((so) => so.status === status).length
+
   return (
     <>
       <PageHeader
         title="訂單"
+        back={{ to: `/stall/${stallId}`, label: '我的場次' }}
+        nav={<DayTabs stallId={stallId} dayId={dayId} />}
         subtitle={
           lastSync
             ? `最後更新 ${lastSync.toLocaleTimeString('zh-TW', { hour12: false })}`
@@ -119,17 +127,21 @@ export default function SubOrders() {
         }
       />
 
-      <div className="mb-3 flex gap-1 overflow-x-auto px-4 text-sm">
+      <div className="mb-3 grid grid-cols-3 gap-2 px-4 text-sm">
         {TABS.map((t) => (
           <button
             key={t.value}
             type="button"
             onClick={() => setTab(t.value)}
-            className={`whitespace-nowrap rounded-lg px-3 py-1.5 ${
-              tab === t.value ? 'bg-brand-50 font-medium text-brand-700' : 'text-neutral-600'
+            aria-pressed={tab === t.value}
+            className={`min-h-11 whitespace-nowrap rounded-full border px-2 ${
+              tab === t.value
+                ? 'border-brand-500 bg-brand-500 font-medium text-white'
+                : 'border-neutral-200 bg-white text-neutral-700'
             }`}
           >
             {t.label}
+            {all ? <span className="tabular-nums">（{countOf(t.value)}）</span> : null}
           </button>
         ))}
       </div>
@@ -143,7 +155,7 @@ export default function SubOrders() {
           {items.map((so) => (
             <li key={so.id}>
               <Link
-                to={`/stall/${stallId}/sub-orders/${so.id}`}
+                to={`/stall/${stallId}/sub-orders/${so.id}?day=${dayId}`}
                 className={`card block p-4 transition active:bg-neutral-50 ${
                   flashIds.has(so.id) ? 'animate-pulse ring-2 ring-brand-400' : ''
                 }`}

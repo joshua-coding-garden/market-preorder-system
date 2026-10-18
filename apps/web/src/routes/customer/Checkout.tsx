@@ -105,7 +105,7 @@ export default function Checkout() {
   if (cart.data.stalls.length === 0) {
     return (
       <>
-        <PageHeader title="訂購" />
+        <PageHeader title="訂購" back={{ to: `/days/${dayId}`, label: '回場次' }} />
         <p className="px-4 text-sm text-neutral-600">購物車是空的，請先挑選商品。</p>
       </>
     )
@@ -116,6 +116,7 @@ export default function Checkout() {
       <PageHeader
         title="訂購"
         subtitle={`${formatTaipeiDate(day.data.eventDate)}・${day.data.market.name}`}
+        back={{ to: `/days/${dayId}/cart`, label: '購物車' }}
       />
 
       <form onSubmit={submit} className="space-y-4 px-4 pb-10">

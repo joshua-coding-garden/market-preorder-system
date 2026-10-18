@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { api } from '@/api/client'
 import { toMessage, useApi } from '@/api/useApi'
 import {
@@ -17,6 +17,12 @@ import type { StallSubOrder } from './SubOrders'
 /** S7 訂單詳情 */
 export default function SubOrderDetail() {
   const { stallId = '', id = '' } = useParams()
+  // 從訂單列表點進來會帶 ?day=，返回鍵回到那個場次的訂單；沒帶就回我的場次
+  const [search] = useSearchParams()
+  const day = search.get('day')
+  const back = day
+    ? { to: `/stall/${stallId}/days/${day}/orders`, label: '訂單' }
+    : { to: `/stall/${stallId}`, label: '我的場次' }
   const { data, loading, error, reload } = useApi<StallSubOrder>(
     `/stalls/${stallId}/sub-orders/${id}`,
   )
@@ -51,6 +57,7 @@ export default function SubOrderDetail() {
     <>
       <PageHeader
         title="訂單詳情"
+        back={back}
         action={<StatusBadge status={data.status} label={subOrderStatusLabel[data.status]} />}
       />
 

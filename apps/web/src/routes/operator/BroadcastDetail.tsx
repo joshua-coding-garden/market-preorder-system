@@ -160,6 +160,7 @@ export default function BroadcastDetail() {
     <>
       <PageHeader
         title={isNew ? '廠商自發推播' : '推播內容'}
+        back={{ to: '/operator/broadcasts', label: '推播' }}
         subtitle={b?.stall ? `來自 ${b.stall.name}` : isNew ? undefined : '廠商自發'}
         action={
           b ? (

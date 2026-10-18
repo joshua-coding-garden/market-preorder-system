@@ -58,9 +58,13 @@ export default function App() {
             <Route index element={<MarketHome />} />
             <Route path="markets/:marketId" element={<MarketDayList />} />
             <Route path="login" element={<Login />} />
-            <Route path="days/:dayId" element={<MarketDayPage />} />
-            <Route path="days/:dayId/products/:listingId" element={<ProductDetail />} />
-            <Route path="days/:dayId/stalls/:stallId" element={<StallPage />} />
+            {/* 商品詳情是疊在場次頁／攤商頁上的彈窗，所以掛成它們的子路由 */}
+            <Route path="days/:dayId" element={<MarketDayPage />}>
+              <Route path="products/:listingId" element={<ProductDetail />} />
+            </Route>
+            <Route path="days/:dayId/stalls/:stallId" element={<StallPage />}>
+              <Route path="products/:listingId" element={<ProductDetail />} />
+            </Route>
             <Route path="days/:dayId/cart" element={<Cart />} />
             <Route path="days/:dayId/checkout" element={<Checkout />} />
             <Route path="orders" element={<MyOrders />} />
@@ -76,7 +80,9 @@ export default function App() {
               </RequireCapability>
             }
           >
+            {/* /stall 會導到第一個攤商的 /stall/:stallId；攤商 id 放網址，管理員代管時才找得到是哪一攤 */}
             <Route index element={<StallHome />} />
+            <Route path=":stallId" element={<StallHome />} />
             <Route path=":stallId/profile" element={<StallProfilePage />} />
             <Route path=":stallId/products" element={<StallProducts />} />
             <Route path=":stallId/products/:id" element={<StallProductEdit />} />

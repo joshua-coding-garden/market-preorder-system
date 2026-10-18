@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Sheet from './Sheet'
 
 /**
  * ⚠️ 規格外（委託方 2026-09-20 指示）：首頁使用說明。
@@ -67,21 +68,34 @@ export default function HowItWorks() {
         <span className="text-xs text-brand-600">{open ? '收合' : '展開'}</span>
       </button>
 
-      {open ? (
-        <ol className="space-y-3 border-t border-brand-100 px-4 py-3">
-          {STEPS.map((s) => (
-            <li key={s.n} className="flex gap-3">
-              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500 text-xs font-bold text-white">
-                {s.n}
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-neutral-800">{s.title}</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-neutral-600">{s.body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      ) : null}
+      {open ? <HowItWorksSteps className="border-t border-brand-100 px-4 py-3" /> : null}
     </section>
+  )
+}
+
+function HowItWorksSteps({ className = '' }: { className?: string }) {
+  return (
+    <ol className={`space-y-3 ${className}`}>
+      {STEPS.map((s) => (
+        <li key={s.n} className="flex gap-3">
+          <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500 text-xs font-bold text-white">
+            {s.n}
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-neutral-800">{s.title}</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-neutral-600">{s.body}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+/** ⚠️ 規格外（2026-10-18）：☰ 選單與場次頁浮動按鈕的「怎麼預購」 */
+export function HowItWorksSheet({ onClose }: { onClose: () => void }) {
+  return (
+    <Sheet title="怎麼預購？" onClose={onClose}>
+      <HowItWorksSteps className="pb-2" />
+    </Sheet>
   )
 }

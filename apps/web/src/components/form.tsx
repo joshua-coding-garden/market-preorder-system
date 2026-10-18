@@ -35,10 +35,21 @@ export function FormError({ message }: { message: string | null }) {
   )
 }
 
-export function Toast({ message }: { message: string | null }) {
+export function Toast({
+  message,
+  position = 'bottom',
+}: {
+  message: string | null
+  /** 場次頁右下角有浮動按鈕，提示改放上面才不會疊在一起 */
+  position?: 'bottom' | 'top'
+}) {
   if (!message) return null
   return (
-    <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-neutral-900/90 px-5 py-2.5 text-sm text-white shadow-lg">
+    <div
+      className={`fixed left-1/2 z-50 -translate-x-1/2 rounded-full bg-neutral-900/90 px-5 py-2.5 text-sm text-white shadow-lg ${
+        position === 'top' ? 'top-6' : 'bottom-6'
+      }`}
+    >
       {message}
     </div>
   )

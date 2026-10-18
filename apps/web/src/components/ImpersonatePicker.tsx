@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api } from '@/api/client'
 import { toMessage, useApi } from '@/api/useApi'
+import { DrawerButton } from './Drawer'
 import { FormError } from './form'
 import Sheet from './Sheet'
 
@@ -22,14 +23,15 @@ interface TargetsResponse {
  * 切換之後權限是**真的**降下去的 —— 換發 session 後所有後端 assert* 照常生效，
  * 不是前端把按鈕藏起來。
  *
- * 這個元件自己管狀態，因此可以同時放在後台標題列與帳號與權限頁。
+ * 這個元件自己管狀態，因此可以同時放在後台 ☰ 選單與帳號與權限頁。
  * 彈出面板用共用的 `Sheet`（裡面有 portal，理由見該檔註解）。
  */
 export default function ImpersonatePicker({
   variant = 'button',
   selfId,
 }: {
-  variant?: 'button' | 'compact'
+  /** menu：放在 ☰ 選單裡，長得跟其他選單項目一樣 */
+  variant?: 'button' | 'menu'
   selfId?: string
 }) {
   const targets = useApi<TargetsResponse>('/operator/impersonation/targets')
@@ -52,17 +54,15 @@ export default function ImpersonatePicker({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className={
-          variant === 'compact'
-            ? 'shrink-0 rounded-lg border border-brand-300 bg-brand-50 px-2.5 py-1.5 text-xs font-medium text-brand-700'
-            : 'btn-secondary text-sm'
-        }
-      >
-        以其他身分檢視
-      </button>
+      {variant === 'menu' ? (
+        <DrawerButton icon="eye" onClick={() => setOpen(true)}>
+          以其他身分檢視
+        </DrawerButton>
+      ) : (
+        <button type="button" onClick={() => setOpen(true)} className="btn-secondary text-sm">
+          以其他身分檢視
+        </button>
+      )}
 
       {open ? (
         <Targets

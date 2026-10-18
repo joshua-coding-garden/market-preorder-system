@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { api } from '@/api/client'
 import { toMessage, useApi } from '@/api/useApi'
 import { MoneyTWD, PageHeader, formatTaipeiDateTime } from '@/components/common'
+import DayTabs from './DayTabs'
 import { FormError, StatusBadge } from '@/components/form'
 import { subOrderStatusLabel } from '@/i18n/zh-TW'
 import type { StallSubOrder } from './SubOrders'
@@ -83,7 +84,12 @@ export default function Pickup() {
 
   return (
     <>
-      <PageHeader title="核銷取貨" subtitle="請顧客出示取貨碼" />
+      <PageHeader
+        title="核銷取貨"
+        subtitle="請顧客出示取貨碼"
+        back={{ to: `/stall/${stallId}`, label: '我的場次' }}
+        nav={<DayTabs stallId={stallId} dayId={dayId} />}
+      />
 
       <div className="px-4">
         <form

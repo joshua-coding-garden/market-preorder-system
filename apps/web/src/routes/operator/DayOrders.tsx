@@ -106,6 +106,7 @@ export default function DayOrders() {
     <>
       <PageHeader
         title="訂單總覽"
+        back={{ to: `/operator/days/${id}`, label: '場次詳情' }}
         subtitle={day.data ? formatTaipeiDate(day.data.eventDate) : undefined}
         action={
           <button type="button" className="btn-secondary text-sm" onClick={exportCsv}>

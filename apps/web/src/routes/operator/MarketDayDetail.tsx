@@ -127,6 +127,7 @@ export default function MarketDayDetail() {
     <>
       <PageHeader
         title={formatTaipeiDate(d.eventDate)}
+        back={{ to: '/operator/days', label: '場次' }}
         subtitle={`${d.market.code}｜${d.market.name}・${d.market.location}`}
         action={<StatusBadge status={d.status} label={marketDayStatusLabel[d.status]} />}
       />

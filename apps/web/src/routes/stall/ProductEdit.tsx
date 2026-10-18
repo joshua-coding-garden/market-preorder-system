@@ -142,7 +142,10 @@ export default function ProductEdit() {
 
   return (
     <>
-      <PageHeader title={isNew ? '新增商品' : '編輯商品'} />
+      <PageHeader
+        title={isNew ? '新增商品' : '編輯商品'}
+        back={{ to: `/stall/${stallId}/products`, label: '商品管理' }}
+      />
 
       <form onSubmit={save} className="space-y-4 px-4 pb-10">
         <FormError message={error} />

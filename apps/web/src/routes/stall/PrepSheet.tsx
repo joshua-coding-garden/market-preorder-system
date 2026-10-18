@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useApi } from '@/api/useApi'
 import { useStallSocket } from '@/api/socket'
 import { EmptyState, ErrorState, PageHeader, Spinner } from '@/components/common'
+import DayTabs from './DayTabs'
 
 interface PrepData {
   products: {
@@ -41,6 +42,8 @@ export default function PrepSheet() {
     <>
       <PageHeader
         title="備貨總表"
+        back={{ to: `/stall/${stallId}`, label: '我的場次' }}
+        nav={<DayTabs stallId={stallId} dayId={dayId} />}
         subtitle={`只計待取貨與已取貨・最後更新 ${new Date(data.updatedAt).toLocaleTimeString('zh-TW', { hour12: false })}`}
         action={
           <button type="button" className="btn-secondary text-sm" onClick={reload}>

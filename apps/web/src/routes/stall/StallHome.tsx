@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate, useParams } from 'react-router-dom'
 import type { MarketDayStatus } from '@market/shared'
 import { useApi } from '@/api/useApi'
 import {
@@ -14,7 +13,7 @@ import { StatusBadge } from '@/components/form'
 import { marketDayStatusLabel } from '@/i18n/zh-TW'
 import { useSession } from '@/store/session'
 
-interface StallDayRow {
+export interface StallDayRow {
   participationId: string
   boothNo: string
   marketDay: {
@@ -28,65 +27,58 @@ interface StallDayRow {
   }
 }
 
-/** S1 攤商首頁：我的攤商、即將到來的場次、輸入邀請碼入口 */
+/** 場次卡片上的四個入口；場次子頁上方的頁籤也用同一份 */
+export const DAY_SECTIONS = [
+  { path: 'listings', label: '上架' },
+  { path: 'orders', label: '訂單' },
+  { path: 'prep', label: '備貨' },
+  { path: 'pickup', label: '核銷' },
+] as const
+
+/**
+ * S1 攤商首頁：我的場次。
+ * ⚠️ 規格外（2026-10-18）：攤商 id 改放網址（/stall/:stallId），切換攤商、商品管理、
+ * 基本資料、輸入邀請碼都移到 ☰ 選單。/stall 會導到第一個攤商。
+ */
 export default function StallHome() {
+  const { stallId } = useParams()
   const { me } = useSession()
-  const stalls = me?.stalls ?? []
-  const [selected, setSelected] = useState<string | null>(null)
-  const stallId = selected ?? stalls[0]?.id ?? null
+  const first = me?.stalls[0]?.id
 
   const { data, loading, error, reload } = useApi<{ items: StallDayRow[] }>(
     stallId ? `/stalls/${stallId}/market-days` : null,
   )
 
-  if (stalls.length === 0) {
+  if (!stallId) {
+    if (first) return <Navigate to={`/stall/${first}`} replace />
     return (
       <>
         <PageHeader title="攤商專區" />
         <div className="px-4">
           <EmptyState
             title="您還沒有綁定攤商"
-            hint="向主辦單位索取邀請碼，綁定後就能管理商品與訂單"
+            hint={
+              me?.capabilities.operator
+                ? '管理員可以從市集後台的「攤商」進入任一攤代管'
+                : '向主辦單位索取邀請碼，綁定後就能管理商品與訂單'
+            }
           />
-          <Link to="/stall/redeem" className="btn-primary w-full">
-            輸入邀請碼
+          <Link
+            to={me?.capabilities.operator ? '/operator/stalls' : '/stall/redeem'}
+            className="btn-primary w-full"
+          >
+            {me?.capabilities.operator ? '前往市集後台' : '輸入邀請碼'}
           </Link>
         </div>
       </>
     )
   }
 
+  const stallName = me?.stalls.find((s) => s.id === stallId)?.name
+
   return (
     <>
-      <PageHeader
-        title="攤商專區"
-        action={
-          <Link to="/stall/redeem" className="btn-secondary text-sm">
-            輸入邀請碼
-          </Link>
-        }
-      />
-
-      {stalls.length > 1 ? (
-        <div className="mb-3 flex gap-1 overflow-x-auto px-4 text-sm">
-          {stalls.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setSelected(s.id)}
-              className={`whitespace-nowrap rounded-lg px-3 py-1.5 ${
-                stallId === s.id
-                  ? 'bg-brand-50 font-medium text-brand-700'
-                  : 'text-neutral-600'
-              }`}
-            >
-              {s.name}
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      <h2 className="px-4 pb-2 text-base font-semibold">場次</h2>
+      <PageHeader title="我的場次" subtitle={stallName} />
 
       {loading ? <Spinner /> : null}
       {error ? <ErrorState message={error} onRetry={reload} /> : null}
@@ -113,50 +105,25 @@ export default function StallHome() {
                 />
               </div>
               <p className="mt-2 text-sm text-neutral-600 tabular-nums">
-                {row.marketDay.openTime}–{row.marketDay.closeTime}{'  '}截止{' '}
+                {row.marketDay.openTime}–{row.marketDay.closeTime}{'  '}預購截止{' '}
                 {formatTaipeiDateTime(row.marketDay.orderDeadline)}
               </p>
 
-              <div className="mt-3 flex flex-wrap gap-2 text-sm">
-                <Link
-                  to={`/stall/${stallId}/days/${row.marketDay.id}/listings`}
-                  className="rounded-lg border border-neutral-300 px-2.5 py-1.5"
-                >
-                  本場上架
-                </Link>
-                <Link
-                  to={`/stall/${stallId}/days/${row.marketDay.id}/orders`}
-                  className="rounded-lg border border-neutral-300 px-2.5 py-1.5"
-                >
-                  訂單
-                </Link>
-                <Link
-                  to={`/stall/${stallId}/days/${row.marketDay.id}/prep`}
-                  className="rounded-lg border border-neutral-300 px-2.5 py-1.5"
-                >
-                  備貨總表
-                </Link>
-                <Link
-                  to={`/stall/${stallId}/days/${row.marketDay.id}/pickup`}
-                  className="rounded-lg border border-neutral-300 px-2.5 py-1.5"
-                >
-                  核銷
-                </Link>
+              <div className="mt-3 grid grid-cols-4 gap-1.5 text-sm">
+                {DAY_SECTIONS.map((s) => (
+                  <Link
+                    key={s.path}
+                    to={`/stall/${stallId}/days/${row.marketDay.id}/${s.path}`}
+                    className="flex min-h-11 items-center justify-center rounded-xl border border-neutral-300 active:bg-neutral-50"
+                  >
+                    {s.label}
+                  </Link>
+                ))}
               </div>
             </li>
           ))}
         </ul>
       ) : null}
-
-      <div className="flex gap-2 px-4 pb-8">
-        <Link to={`/stall/${stallId}/products`} className="btn-secondary flex-1">
-          商品管理
-        </Link>
-        {/* 委託方 2026-09-20：攤商要能自己看／改基本資料 */}
-        <Link to={`/stall/${stallId}/profile`} className="btn-secondary flex-1">
-          基本資料
-        </Link>
-      </div>
     </>
   )
 }

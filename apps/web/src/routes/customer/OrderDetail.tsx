@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import type { OrderDetail as Order } from '@/api/cartTypes'
 import { useApi } from '@/api/useApi'
 import {
+  BackLink,
   ErrorState,
   MoneyTWD,
   PickupCode,
@@ -22,7 +23,10 @@ export default function OrderDetail() {
 
   return (
     <div className="pb-10">
-      <section className="bg-white px-4 pb-4 pt-6 text-center">
+      <div className="px-4">
+        <BackLink to="/orders" label="我的訂單" />
+      </div>
+      <section className="bg-white px-4 pb-4 pt-4 text-center">
         <p className="text-lg font-bold text-green-700">預購完成</p>
         <p className="mt-2 text-base font-semibold">{formatTaipeiDate(data.marketDay.eventDate)}</p>
         <p className="mt-0.5 text-sm text-neutral-600">

@@ -4,6 +4,7 @@ import type { ListingStatus } from '@market/shared'
 import { api } from '@/api/client'
 import { toMessage, useApi } from '@/api/useApi'
 import { ErrorState, MoneyTWD, PageHeader, Spinner } from '@/components/common'
+import DayTabs from './DayTabs'
 import { FormError, Toast, inputClass } from '@/components/form'
 
 interface ProductRow {
@@ -129,7 +130,8 @@ export default function Listings() {
     <>
       <PageHeader
         title="本場上架"
-        subtitle={thisDay ? `${thisDay.marketDay.eventDate}・攤位 ${thisDay.boothNo}` : undefined}
+        back={{ to: `/stall/${stallId}`, label: '我的場次' }}
+        nav={<DayTabs stallId={stallId} dayId={dayId} />}
         action={
           !isClosed ? (
             <button type="button" className="btn-secondary text-sm" onClick={copyFrom}>

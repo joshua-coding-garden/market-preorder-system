@@ -35,7 +35,11 @@ export default function Cart() {
 
   return (
     <>
-      <PageHeader title="購物車" subtitle={isEmpty ? undefined : `${data.itemCount} 件商品`} />
+      <PageHeader
+        title="購物車"
+        subtitle={isEmpty ? undefined : `${data.itemCount} 件商品`}
+        back={{ to: `/days/${dayId}`, label: '回場次' }}
+      />
 
       <div className="px-4">
         <FormError message={actionError} />

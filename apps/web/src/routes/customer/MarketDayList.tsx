@@ -23,7 +23,11 @@ export default function MarketDayList() {
 
   return (
     <>
-      <PageHeader title={market?.name ?? '場次列表'} subtitle="選擇場次開始預購" />
+      <PageHeader
+        title={market?.name ?? '場次列表'}
+        subtitle="選擇場次開始預購"
+        back={{ to: '/', label: '市集列表' }}
+      />
 
       {days.data.items.length === 0 ? (
         <EmptyState title="目前沒有開放預購的場次" hint="市集開放後會在這裡顯示" />

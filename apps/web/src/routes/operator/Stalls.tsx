@@ -155,6 +155,12 @@ export default function Stalls() {
                   後端本來就允許 operator 代操作，這裡只是補上入口，不另做一套畫面。 */}
               <div className="mt-3 flex flex-wrap gap-2 text-sm">
                 <Link
+                  to={`/stall/${s.id}`}
+                  className="rounded-lg border border-neutral-300 px-2.5 py-1.5"
+                >
+                  攤商首頁
+                </Link>
+                <Link
                   to={`/stall/${s.id}/products`}
                   className="rounded-lg border border-neutral-300 px-2.5 py-1.5"
                 >
