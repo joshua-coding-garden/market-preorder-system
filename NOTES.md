@@ -333,6 +333,25 @@ layout 不提供 `ShellProvider` 時 `PageHeader` 就不畫 ☰ 與頭像，`bac
 **移除方式**：`welcomeMessage()` 把 `quickReply` 加回去（三顆都用 `appLink()`）；
 `guard.tsx` 拿掉 `capability === 'stall'` 那行 `Navigate`，「沒有權限」補回攤商的說明文字。
 
+### 13. 攤商專區沒登入直接送 LINE 登入（2026-10-31，測試回報）
+
+**背景**：電腦版 LINE 用外部瀏覽器開圖文選單的連結，那裡沒有 LINE 身分，
+點「攤商專區」會落在 C9 登入頁，標題是顧客文案「歡迎來到市集預購」，攤商以為點錯。
+
+**做法**：
+
+| 項目 | 內容 |
+|---|---|
+| 範圍 | 只有 `/stall/*`（含 `/stall/redeem`），在 LINE 外開啟且沒登入時直接走 `goToLogin('line')`，登入完回原本的路徑。LINE 內照舊由 LIFF 自動登入；`/operator/*`、顧客頁照舊進 C9 |
+| 判斷時機 | 只在 session 載完時判斷一次。登出時 `me` 也會變成 `null`，那時不能再送去登入 |
+| 防繞圈 | 同一個分頁只送一次（`sessionStorage` 的 `stall-line-login-tried`）。登入回來還是沒有 session、或在 LINE 按取消，就顯示 C9 |
+
+影響：用帳號密碼登入的帳號（例如管理員 test）在沒登入的瀏覽器直接開 `/stall/*`，
+會被帶去 LINE 登入。要先到 `/login` 登入再進，或從後台「攤商首頁」代管進去。
+沒設 LINE Login 的環境會停在 API 的錯誤訊息，按上一頁會回到 C9。
+
+**移除方式**：`guard.tsx` 拿掉 `autoLineLogin` 的 state 與 effect，`Spinner` 條件改回只看 `loading`。
+
 ### 測試與驗證
 
 - API 測試 219 筆全綠（新增 `review.test.ts` 22 筆、`confirm.test.ts` 11 筆）

@@ -200,6 +200,8 @@ pnpm test
 3. 前端啟動時 `liff.init()` 還原路徑，若尚未登入就拿 LIFF 的 ID token 打
    `POST /api/auth/line/liff`，伺服器驗證後簽發 session。使用者不用按任何登入按鈕。
 4. 沒設 `LIFF_ID` 時，按鈕退回一般網址，使用者點開後要按一次「使用 LINE 登入」。
+5. 電腦版 LINE 會用外部瀏覽器開連結，那裡沒有 LINE 身分。開攤商專區（`/stall/*`）時沒登入
+   會直接送 LINE 登入，不經過登入頁；其他頁面照舊進登入頁。
 
 ### 把自己設成廠商（operator）
 
