@@ -107,7 +107,7 @@ describe('S5-1 簽章驗證', () => {
 })
 
 describe('S5-2 follow 事件', () => {
-  it('新增 app_user 並回覆含「本週市集」按鈕的歡迎訊息', async () => {
+  it('新增 app_user 並回覆提到「本週市集」的歡迎訊息', async () => {
     const line = installMockLine({ profile: { displayName: '小美' } })
 
     const res = await postWebhook([
@@ -127,6 +127,20 @@ describe('S5-2 follow 事件', () => {
     expect(line.calls.reply).toHaveLength(1)
     const text = JSON.stringify(line.calls.reply[0].messages)
     expect(text).toContain('本週市集')
+  })
+
+  it('歡迎訊息不附按鈕，攤商指向圖文選單的「攤商專區」', async () => {
+    const line = installMockLine()
+
+    await postWebhook([
+      { type: 'follow', replyToken: 'r', source: { type: 'user', userId: 'Uwelcome1' } },
+    ])
+
+    const [message] = line.calls.reply[0].messages
+    expect(message).not.toHaveProperty('quickReply')
+    const text = (message as { text: string }).text
+    expect(text).toContain('攤商專區')
+    expect(text).not.toContain('我是攤商')
   })
 
   it('已存在的使用者不會重複建立', async () => {
@@ -255,7 +269,7 @@ describe('postback 與 unfollow（04 §D）', () => {
   })
 })
 
-describe('0916 入口流程：歡迎訊息的連結', () => {
+describe('0916 入口流程：按鈕連結', () => {
   it('buildAppLink：有 LIFF_ID 時是 LIFF 網址，沒有就是 WEB_URL', () => {
     const withLiff = { liffId: '1234-abcd', webUrl: 'https://x.test' }
     const noLiff = { liffId: '', webUrl: 'https://x.test' }
@@ -267,27 +281,27 @@ describe('0916 入口流程：歡迎訊息的連結', () => {
     expect(buildAppLink('orders', noLiff)).toBe('https://x.test/orders')
   })
 
-  it('有設 LIFF_ID 時，follow 的歡迎訊息三個按鈕都是 LIFF 網址，含「我是攤商」', async () => {
-    const line = installMockLine({ profile: { displayName: '新朋友' } })
+  it('有設 LIFF_ID 時，回覆裡的按鈕是 LIFF 網址', async () => {
+    const line = installMockLine()
     const original = config.LIFF_ID
     Object.assign(config, { LIFF_ID: 'test-liff-id' })
     try {
       await postWebhook([
-        { type: 'follow', replyToken: 'r-liff', source: { type: 'user', userId: 'Uliff1' } },
+        {
+          type: 'postback',
+          replyToken: 'r-liff',
+          source: { type: 'user', userId: 'Uliff1' },
+          postback: { data: 'action=open_stall' },
+        },
       ])
     } finally {
       Object.assign(config, { LIFF_ID: original })
     }
 
     const [message] = line.calls.reply[0].messages
-    const items = (
-      message as { quickReply: { items: { action: { label: string; uri: string } }[] } }
-    ).quickReply.items
-    expect(items.map((i) => i.action.label)).toEqual(['本週市集', '我的訂單', '我是攤商'])
-    for (const item of items) {
-      expect(item.action.uri).toMatch(/^https:\/\/liff\.line\.me\/test-liff-id\//)
-    }
-    expect(items[2].action.uri).toBe('https://liff.line.me/test-liff-id/stall/redeem')
+    const items = (message as { quickReply: { items: { action: { uri: string } }[] } })
+      .quickReply.items
+    expect(items[0].action.uri).toBe('https://liff.line.me/test-liff-id/stall')
   })
 
   it('沒設 LIFF_ID 時退回 WEB_URL', async () => {
@@ -296,13 +310,18 @@ describe('0916 入口流程：歡迎訊息的連結', () => {
     Object.assign(config, { LIFF_ID: '' })
     try {
       await postWebhook([
-        { type: 'follow', replyToken: 'r-web', source: { type: 'user', userId: 'Uweb1' } },
+        {
+          type: 'postback',
+          replyToken: 'r-web',
+          source: { type: 'user', userId: 'Uweb1' },
+          postback: { data: 'action=open_stall' },
+        },
       ])
     } finally {
       Object.assign(config, { LIFF_ID: original })
     }
     const text = JSON.stringify(line.calls.reply[0].messages)
-    expect(text).toContain(`${config.WEB_URL}/stall/redeem`)
+    expect(text).toContain(`${config.WEB_URL}/stall`)
     expect(text).not.toContain('liff.line.me')
   })
 })

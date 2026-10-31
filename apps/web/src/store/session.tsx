@@ -39,7 +39,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    * 首次載入（0916 入口流程）：
    * LIFF 初始化與 /me 同時進行；LIFF 會把 liff.state 還原成原本要去的路徑。
    * 若尚未登入且是從 LINE 內開啟，就用 LIFF 的 ID token 自動換 session，
-   * 使用者從歡迎訊息點進來不用再按登入。
+   * 使用者從圖文選單點進來不用再按登入。
    */
   const bootstrap = async (): Promise<void> => {
     try {

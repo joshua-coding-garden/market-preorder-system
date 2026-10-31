@@ -8,6 +8,9 @@ import { useSession } from '@/store/session'
  *   /stall/*    需 capabilities.stall（operator 也通過）
  *   /operator/* 需 capabilities.operator
  * 這只是體驗，後端一律另行檢查（B-1、B-2）。
+ *
+ * 規格外（2026-10-31）：還不是攤商成員的人進 /stall/* 直接導到輸入邀請碼。
+ * 歡迎訊息不附按鈕之後，新攤商是從圖文選單的「攤商專區」進來。
  */
 export function RequireCapability({
   capability,
@@ -26,14 +29,12 @@ export function RequireCapability({
   }
 
   if (!me.capabilities[capability]) {
+    if (capability === 'stall') return <Navigate to="/stall/redeem" replace />
+
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
         <p className="text-lg font-semibold text-neutral-800">沒有權限</p>
-        <p className="mt-2 text-sm text-neutral-500">
-          {capability === 'stall'
-            ? '您還不是攤商成員。請向主辦單位索取邀請碼後綁定。'
-            : '此區域僅限市集主辦單位使用。'}
-        </p>
+        <p className="mt-2 text-sm text-neutral-500">此區域僅限市集主辦單位使用。</p>
         {/* 沒有這排的話，換成低權限帳號登入就會困在這頁出不去 */}
         <div className="mt-6 flex items-center justify-center gap-4 text-sm">
           <Link to="/" className="text-brand-600">

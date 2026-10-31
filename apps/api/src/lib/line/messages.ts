@@ -32,7 +32,10 @@ export function appLink(path: string): string {
 
 /**
  * 歡迎訊息（follow 事件）。
- * 0916 入口流程：加入好友 → 點按鈕 → 以 LINE 身分完成註冊並進入網頁。
+ * 0916 入口流程：加入好友 → 點圖文選單 → 以 LINE 身分完成註冊並進入網頁。
+ *
+ * 規格外（2026-10-31 測試回報）：不附按鈕。手機上會跟圖文選單疊成上下兩排，
+ * 名稱還不一樣（我是攤商／攤商專區），入口統一用圖文選單。
  */
 export function welcomeMessage(): LineMessage[] {
   return [
@@ -40,27 +43,11 @@ export function welcomeMessage(): LineMessage[] {
       type: 'text',
       text: [
         '歡迎加入市集預購！',
-        '點下方「本週市集」就能用 LINE 身分直接進入，不用另外註冊。',
+        '點下方選單的「本週市集」就能用 LINE 身分直接進入，不用另外註冊。',
         '選好商品與取貨時間後，到現場出示取貨碼付款取貨。',
         '',
-        '攤商請點「我是攤商」輸入邀請碼，或直接在這裡輸入：邀請碼 XXXX',
+        '攤商請點下方選單的「攤商專區」輸入邀請碼，或直接在這裡輸入：邀請碼 XXXX',
       ].join('\n'),
-      quickReply: {
-        items: [
-          {
-            type: 'action',
-            action: { type: 'uri', label: '本週市集', uri: appLink('/') },
-          },
-          {
-            type: 'action',
-            action: { type: 'uri', label: '我的訂單', uri: appLink('/orders') },
-          },
-          {
-            type: 'action',
-            action: { type: 'uri', label: '我是攤商', uri: appLink('/stall/redeem') },
-          },
-        ],
-      },
     },
   ]
 }

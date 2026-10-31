@@ -91,7 +91,7 @@ pnpm dev        # 3. 啟動 API 與前端（一定要在 tunnel 之後，才會�
   並把 `COOKIE_SECURE` 設成 `true`（通道是 HTTPS）。
 
 把印出的公開網址照下面「LINE Developers Console 設定」填進三個地方
-（Callback URL、Webhook URL、LIFF Endpoint URL），手機 LINE 加官方帳號好友就能從歡迎訊息點進來。
+（Callback URL、Webhook URL、LIFF Endpoint URL），手機 LINE 加官方帳號好友就能從圖文選單點進來。
 
 > `pnpm tunnel` 改寫 `.env` 後，API 要重啟才會讀到（`tsx watch` 不會重讀 `.env`）。
 
@@ -194,9 +194,9 @@ pnpm test
 
 ### LINE 入口流程（0916）
 
-1. 使用者加官方帳號好友 → webhook 收到 `follow`，建立帳號並回歡迎訊息，
-   三個按鈕：本週市集、我的訂單、我是攤商（邀請碼綁定頁）。
-2. 按鈕與圖文選單都是 LIFF 網址 `https://liff.line.me/{LIFF_ID}/路徑`，在 LINE 內開啟。
+1. 使用者加官方帳號好友 → webhook 收到 `follow`，建立帳號並回歡迎訊息（純文字，不附按鈕），
+   引導點下方圖文選單：本週市集、我的訂單、攤商專區（還沒綁定的人會直接進到輸入邀請碼）。
+2. 圖文選單與通知訊息的按鈕都是 LIFF 網址 `https://liff.line.me/{LIFF_ID}/路徑`，在 LINE 內開啟。
 3. 前端啟動時 `liff.init()` 還原路徑，若尚未登入就拿 LIFF 的 ID token 打
    `POST /api/auth/line/liff`，伺服器驗證後簽發 session。使用者不用按任何登入按鈕。
 4. 沒設 `LIFF_ID` 時，按鈕退回一般網址，使用者點開後要按一次「使用 LINE 登入」。

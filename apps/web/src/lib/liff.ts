@@ -4,7 +4,7 @@ import { ApiError, api } from '@/api/client'
 /**
  * LIFF 入口流程（0916）。
  *
- * 使用者從 LINE 的歡迎訊息或圖文選單點進來時，網址是 LIFF 網址，
+ * 使用者從 LINE 的圖文選單或通知訊息點進來時，網址是 LIFF 網址，
  * 頁面在 LINE 內建瀏覽器開啟。這時：
  *   1. liff.init() 會把 liff.state 還原成原本要去的路徑
  *   2. 拿 LIFF 的 ID token 打 POST /auth/line/liff，由伺服器驗證後簽發自家 session
